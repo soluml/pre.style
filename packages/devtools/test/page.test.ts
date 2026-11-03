@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { call, isLocalHost, matchRules, readSelected, SELECTED, whenLocal } from '../src/page.ts';
+import {
+  call,
+  isAllowedHost,
+  matchRules,
+  readSelected,
+  SELECTED,
+  whenAllowed,
+} from '../src/page.ts';
 import { manifest } from '../src/manifest.ts';
 
 interface Fake {
@@ -127,10 +134,24 @@ describe('call', () => {
   });
 });
 
-describe('isLocalHost', () => {
+describe('isAllowedHost', () => {
   test('accepts this computer', () => {
     for (const host of ['localhost', 'app.localhost', '127.0.0.1', '127.1.2.3', '[::1]', '0.0.0.0'])
-      assert.equal(isLocalHost(host), true, host);
+      assert.equal(isAllowedHost(host), true, host);
+  });
+
+  test('accepts hostnames from the settings', () => {
+    assert.equal(isAllowedHost('app.test', ['app.test']), true);
+    assert.equal(isAllowedHost('192.168.1.5', ['192.168.1.5']), true);
+    assert.equal(isAllowedHost('a.b.test', ['*.test']), true);
+  });
+
+  test('settings match whole names only', () => {
+    assert.equal(isAllowedHost('other.test', ['app.test']), false);
+    assert.equal(isAllowedHost('app.test.example.com', ['app.test']), false);
+    assert.equal(isAllowedHost('notapp.test', ['app.test']), false);
+    assert.equal(isAllowedHost('test', ['*.test']), false);
+    assert.equal(isAllowedHost('nottest', ['*.test']), false);
   });
 
   test('rejects everything else, including lookalikes', () => {
@@ -144,33 +165,41 @@ describe('isLocalHost', () => {
       'app.test',
       '',
     ])
-      assert.equal(isLocalHost(host), false, host);
+      assert.equal(isAllowedHost(host), false, host);
   });
 });
 
-const runWhenLocal = (hostname: string) => {
+const runWhenAllowed = (hostname: string, extra: string[] = []) => {
   const calls: string[] = [];
   const hit = () => calls.push('hit');
-  const result = new Function('location', 'hit', `return ${whenLocal('hit()')}`)({ hostname }, hit);
+  const result = new Function('location', 'hit', `return ${whenAllowed('hit()', extra)}`)(
+    { hostname },
+    hit,
+  );
   return { result, calls };
 };
 
-describe('whenLocal', () => {
+describe('whenAllowed', () => {
   test('runs the expression on a local page', () => {
-    assert.deepEqual(runWhenLocal('localhost'), { result: true, calls: ['hit'] });
+    assert.deepEqual(runWhenAllowed('localhost'), { result: true, calls: ['hit'] });
+  });
+
+  test('runs it on a hostname from the settings', () => {
+    assert.deepEqual(runWhenAllowed('app.test', ['app.test']), { result: true, calls: ['hit'] });
   });
 
   test('never runs it on another site', () => {
-    assert.deepEqual(runWhenLocal('example.com'), { result: false, calls: [] });
+    assert.deepEqual(runWhenAllowed('example.com'), { result: false, calls: [] });
   });
 });
 
 describe('manifest', () => {
-  test('asks for no permissions', () => {
+  test('only asks for storage', () => {
     for (const browser of ['chrome', 'firefox'] as const) {
       const result = manifest(browser, '1.0.0', 'd');
       assert.equal(result.devtools_page, 'devtools.html');
-      assert.equal('permissions' in result, false);
+      assert.equal(result.options_ui.page, 'options.html');
+      assert.deepEqual(result.permissions, ['storage']);
       assert.equal('host_permissions' in result, false);
     }
   });

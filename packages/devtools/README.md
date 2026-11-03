@@ -20,9 +20,15 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 - Chrome (or another Chromium browser) or Firefox 140 or later
 - `@pre.style/vite` with the same version of this extension, running Vite's dev server, with the `sourceMap` option on (the default in dev)
 
-The extension asks for no permissions. It reads from the page you're inspecting, and that page asks its own dev server.
+The extension's only permission is `storage`, for its settings. It reads from the page you're inspecting, and that page asks its own dev server.
 
-It only runs on your own computer: `localhost`, `*.localhost`, and loopback addresses such as `127.0.0.1`. Browsers can't limit a DevTools extension to certain sites, so the tab still appears everywhere, but on other sites it only reads the page's hostname and sends no requests. Dev servers on other names, such as `app.test` or a `192.168.…` address, aren't supported.
+It only runs on your own computer: `localhost`, `*.localhost`, and loopback addresses such as `127.0.0.1`. Browsers can't limit a DevTools extension to certain sites, so the tab still appears everywhere, but on other sites it only reads the page's hostname and sends no requests.
+
+## Other hostnames
+
+If your dev server uses another name, add it in the extension's settings, through **Add a hostname** in the pane or the extension's options page. Entries can be a hostname (`app.test`), an IP address (`192.168.1.5`), or a wildcard (`*.test`, which matches `a.test` but not `test`). They're stored in this browser only.
+
+The pane sends requests to every hostname listed, so only add dev servers. For a name other than an IP address, Vite's [`server.allowedHosts`](https://vite.dev/config/server-options#server-allowedhosts) option also needs to include it, or the pane reports that there's no dev server.
 
 ## Install from source
 

@@ -54,24 +54,27 @@ export function matchRules(
   });
 }
 
-// Whether a page's hostname is this computer. Other names are left out, even
-// private ones like `.test` or `192.168.…`, since they can't be told from a
-// deployed site.
-export function isLocalHost(hostname: string): boolean {
+// Whether the pane may run on a page: its hostname is this computer, or one the
+// user listed in the settings. Nothing else is built in, even private names like
+// `.test` or `192.168.…`, since they can't be told from a deployed site.
+export function isAllowedHost(hostname: string, extra: string[] = []): boolean {
   return (
     hostname === 'localhost' ||
     hostname.endsWith('.localhost') ||
     hostname === '[::1]' ||
     hostname === '0.0.0.0' ||
-    /^127(?:\.\d{1,3}){3}$/.test(hostname)
+    /^127(?:\.\d{1,3}){3}$/.test(hostname) ||
+    extra.some((entry) =>
+      entry.startsWith('*.') ? hostname.endsWith(entry.slice(1)) : hostname === entry,
+    )
   );
 }
 
-// An expression that runs another one only on a local page, and says whether it
-// did. The check is part of the same evaluation, so a navigation can't slip
+// An expression that runs another one only on an allowed page, and says whether
+// it did. The check is part of the same evaluation, so a navigation can't slip
 // between the two and send a request to another site.
-export const whenLocal = (expression: string) =>
-  `${call(isLocalHost, LOCATION_HOSTNAME)} ? (${expression}, true) : false`;
+export const whenAllowed = (expression: string, extra: string[]) =>
+  `${call(isAllowedHost, LOCATION_HOSTNAME, extra)} ? (${expression}, true) : false`;
 
 interface Fetched {
   status: number;

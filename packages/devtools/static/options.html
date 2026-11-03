@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pre.style DevTools settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <h1>Extra dev server hostnames</h1>
+    <p>
+      The pane always works on <code>localhost</code>, <code>*.localhost</code>, and loopback
+      addresses. Add other hostnames your dev servers use, such as <code>app.test</code>,
+      <code>*.test</code>, or <code>192.168.1.5</code>.
+    </p>
+    <p>
+      The pane sends requests to every hostname listed here, so only add dev servers. Vite also
+      needs a hostname other than an IP address in its <code>server.allowedHosts</code> option.
+    </p>
+    <form id="add">
+      <label for="host">Hostname</label>
+      <input id="host" type="text" autocomplete="off" spellcheck="false" />
+      <button type="submit">Add</button>
+    </form>
+    <p id="error" role="alert"></p>
+    <ul id="hosts"></ul>
+    <script src="options.js"></script>
+  </body>
+</html>

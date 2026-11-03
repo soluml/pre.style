@@ -224,3 +224,8 @@ body {
   color: var(--text);
   font-weight: 600;
 }
+
+.message-action {
+  margin-top: 8px;
+  font: inherit;
+}

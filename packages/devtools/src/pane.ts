@@ -7,9 +7,10 @@ import {
   SELECTED,
   startFetch,
   takeFetched,
-  whenLocal,
+  whenAllowed,
 } from './page.ts';
 import type { Selected } from './page.ts';
+import { onHostsChanged, readHosts } from './hosts.ts';
 
 const USAGES_URL = '/__pre.style/usages';
 const USAGES_VERSION = 1;
@@ -28,11 +29,14 @@ const evaluate = <T>(expression: string) =>
 type Lookup = { usages: Usages } | { problem: 'not-local' | 'no-server' | 'outdated' };
 
 let fetches = 0;
+// Hostnames from the settings. Empty until they're read, so nothing extra is
+// allowed before then.
+let extraHosts: string[] = [];
 
 async function fetchUsages(classes: string[]): Promise<Lookup> {
   const id = `f${++fetches}`;
   const url = `${USAGES_URL}?classes=${classes.map(encodeURIComponent).join(',')}`;
-  if (!(await evaluate<boolean>(whenLocal(call(startFetch, id, url)))))
+  if (!(await evaluate<boolean>(whenAllowed(call(startFetch, id, url), extraHosts))))
     return { problem: 'not-local' };
   const deadline = Date.now() + FETCH_TIMEOUT;
   while (Date.now() < deadline) {
@@ -63,10 +67,20 @@ function element<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function message(title: string, detail: string) {
+function message(title: string, detail: string, action?: HTMLElement) {
   const box = element('div', 'message');
   box.append(element('p', 'message-title', title), element('p', 'message-detail', detail));
+  if (action !== undefined) box.append(action);
   content.replaceChildren(box);
+}
+
+function settingsButton() {
+  const button = element('button', 'message-action', 'Add a hostname');
+  button.type = 'button';
+  button.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+  return button;
 }
 
 function sourceLink(source: Source, editor: string) {
@@ -74,7 +88,7 @@ function sourceLink(source: Source, editor: string) {
   link.type = 'button';
   link.title = `Open ${source.file} in your editor`;
   link.addEventListener('click', () => {
-    void evaluate(whenLocal(`fetch(${JSON.stringify(editorUrl(editor, source))})`));
+    void evaluate(whenAllowed(`fetch(${JSON.stringify(editorUrl(editor, source))})`, extraHosts));
   });
   return link;
 }
@@ -144,7 +158,8 @@ function render() {
     label.textContent = '';
     message(
       'Only for local dev servers',
-      'This site isn’t on your computer, so the pane sends it no requests. It works on localhost, *.localhost, and loopback addresses.',
+      'This site isn’t on your computer, so the pane sends it no requests. It works on localhost, *.localhost, loopback addresses, and hostnames you add.',
+      settingsButton(),
     );
     return;
   }
@@ -215,7 +230,7 @@ let running: Promise<void> | null = null;
 let again = false;
 
 async function refresh() {
-  if (!(await evaluate<boolean>(whenLocal('0')))) {
+  if (!(await evaluate<boolean>(whenAllowed('0', extraHosts)))) {
     state.selected = null;
     state.lookup = { problem: 'not-local' };
     render();
@@ -274,4 +289,11 @@ document.documentElement.addEventListener('pointerenter', requestRefresh);
 window.addEventListener('focus', requestRefresh);
 chrome.devtools.panels.elements.onSelectionChanged.addListener(requestRefresh);
 chrome.devtools.network.onNavigated.addListener(requestRefresh);
-requestRefresh();
+
+const loadHosts = () =>
+  readHosts().then((hosts) => {
+    extraHosts = hosts;
+    requestRefresh();
+  });
+onHostsChanged(() => void loadHosts());
+void loadHosts();

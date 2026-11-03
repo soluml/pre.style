@@ -26,3 +26,23 @@ declare namespace chrome.devtools {
     };
   }
 }
+
+declare namespace chrome.runtime {
+  const lastError: { message?: string } | undefined;
+  function openOptionsPage(): void;
+}
+
+// Missing if a browser doesn't offer it to DevTools pages.
+declare namespace chrome {
+  const storage:
+    | {
+        local: {
+          get(key: string, callback: (items: Record<string, unknown> | undefined) => void): void;
+          set(items: Record<string, unknown>, callback: () => void): void;
+        };
+        onChanged: {
+          addListener(listener: (changes: Record<string, unknown>, area: string) => void): void;
+        };
+      }
+    | undefined;
+}

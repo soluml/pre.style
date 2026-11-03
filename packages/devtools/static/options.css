@@ -1,0 +1,68 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  max-width: 520px;
+  margin: 16px;
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+p {
+  margin: 0 0 8px;
+}
+
+form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font: inherit;
+}
+
+button {
+  font: inherit;
+}
+
+#error {
+  min-height: 1.5em;
+  margin-top: 6px;
+  color: #d93025;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+code {
+  font:
+    12px/1.5 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+}
