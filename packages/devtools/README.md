@@ -22,6 +22,8 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 
 The extension asks for no permissions. It reads from the page you're inspecting, and that page asks its own dev server.
 
+It only runs on your own computer: `localhost`, `*.localhost`, and loopback addresses such as `127.0.0.1`. Browsers can't limit a DevTools extension to certain sites, so the tab still appears everywhere, but on other sites it only reads the page's hostname and sends no requests. Dev servers on other names, such as `app.test` or a `192.168.…` address, aren't supported.
+
 ## Install from source
 
 Run `npm run build -w packages/devtools`, which writes one folder per browser to `packages/devtools/dist`.

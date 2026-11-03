@@ -623,7 +623,7 @@ Before 3.1, `include`, `exclude`, `prependFiles`, `libraries`, and `quirksMode` 
 
 Classes are shared, so one class can come from many blocks, and a source map can only point to one of them. The [pre.style DevTools extension](packages/devtools) adds a **pre.style** tab to the Elements panel in Chrome and Firefox. For the selected element, it lists each pre.style rule like the Styles pane does, with a link to every block that uses it.
 
-It works with the Vite dev server while `sourceMap` is on, which is the default in dev. Setting `sourceMap: false` turns it off. It can't read production builds.
+It works with the Vite dev server while `sourceMap` is on, which is the default in dev. Setting `sourceMap: false` turns it off. It only runs on `localhost`, `*.localhost`, and loopback addresses, and sends other sites no requests.
 
 Its links open your editor through Vite, which guesses which one you use. When the dev server runs in VS Code's terminal, the plugin sets the `LAUNCH_EDITOR` environment variable to `code` if it isn't set, which also applies to Vite's error overlay. To choose an editor yourself, set `LAUNCH_EDITOR`.
 

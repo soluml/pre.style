@@ -1,6 +1,14 @@
 import { buildView, classesToFetch, editorUrl, fileCount, location } from './model.ts';
 import type { Rule, ShownRule, Source, Usages } from './model.ts';
-import { call, matchRules, readSelected, SELECTED, startFetch, takeFetched } from './page.ts';
+import {
+  call,
+  matchRules,
+  readSelected,
+  SELECTED,
+  startFetch,
+  takeFetched,
+  whenLocal,
+} from './page.ts';
 import type { Selected } from './page.ts';
 
 const USAGES_URL = '/__pre.style/usages';
@@ -17,14 +25,15 @@ const evaluate = <T>(expression: string) =>
     });
   });
 
-type Lookup = { usages: Usages } | { problem: 'no-server' | 'outdated' };
+type Lookup = { usages: Usages } | { problem: 'not-local' | 'no-server' | 'outdated' };
 
 let fetches = 0;
 
 async function fetchUsages(classes: string[]): Promise<Lookup> {
   const id = `f${++fetches}`;
   const url = `${USAGES_URL}?classes=${classes.map(encodeURIComponent).join(',')}`;
-  await evaluate(`void ${call(startFetch, id, url)}`);
+  if (!(await evaluate<boolean>(whenLocal(call(startFetch, id, url)))))
+    return { problem: 'not-local' };
   const deadline = Date.now() + FETCH_TIMEOUT;
   while (Date.now() < deadline) {
     const result = await evaluate<ReturnType<typeof takeFetched>>(call(takeFetched, id));
@@ -65,7 +74,7 @@ function sourceLink(source: Source, editor: string) {
   link.type = 'button';
   link.title = `Open ${source.file} in your editor`;
   link.addEventListener('click', () => {
-    void evaluate(`void fetch(${JSON.stringify(editorUrl(editor, source))})`);
+    void evaluate(whenLocal(`fetch(${JSON.stringify(editorUrl(editor, source))})`));
   });
   return link;
 }
@@ -131,6 +140,14 @@ function render() {
   if (next === rendered) return;
   rendered = next;
   label.textContent = selected?.label ?? '';
+  if (lookup !== null && 'problem' in lookup && lookup.problem === 'not-local') {
+    label.textContent = '';
+    message(
+      'Only for local dev servers',
+      'This site isn’t on your computer, so the pane sends it no requests. It works on localhost, *.localhost, and loopback addresses.',
+    );
+    return;
+  }
   if (selected === null) {
     message('No element selected', 'Select an element in the Elements panel.');
     return;
@@ -198,6 +215,12 @@ let running: Promise<void> | null = null;
 let again = false;
 
 async function refresh() {
+  if (!(await evaluate<boolean>(whenLocal('0')))) {
+    state.selected = null;
+    state.lookup = { problem: 'not-local' };
+    render();
+    return;
+  }
   const selected = await evaluate<Selected | null>(call(readSelected, SELECTED));
   state.selected = selected;
   if (selected === null) {

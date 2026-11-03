@@ -54,6 +54,25 @@ export function matchRules(
   });
 }
 
+// Whether a page's hostname is this computer. Other names are left out, even
+// private ones like `.test` or `192.168.…`, since they can't be told from a
+// deployed site.
+export function isLocalHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname === '[::1]' ||
+    hostname === '0.0.0.0' ||
+    /^127(?:\.\d{1,3}){3}$/.test(hostname)
+  );
+}
+
+// An expression that runs another one only on a local page, and says whether it
+// did. The check is part of the same evaluation, so a navigation can't slip
+// between the two and send a request to another site.
+export const whenLocal = (expression: string) =>
+  `${call(isLocalHost, LOCATION_HOSTNAME)} ? (${expression}, true) : false`;
+
 interface Fetched {
   status: number;
   type: string | null;
@@ -86,8 +105,11 @@ export function takeFetched(id: string): Fetched | { error: string } | null {
   return result;
 }
 
-// An expression that calls a page function with JSON arguments. `$0` is passed
-// as written, since only the DevTools console has it.
+// An expression that calls a page function with JSON arguments. `$0` and the
+// hostname are passed as written, since they're only known in the page.
 export const call = (fn: (...args: never[]) => unknown, ...args: unknown[]) =>
-  `(${fn.toString()})(${args.map((arg) => (arg === SELECTED ? '$0' : JSON.stringify(arg))).join(',')})`;
+  `(${fn.toString()})(${args.map(argument).join(',')})`;
+const argument = (arg: unknown) =>
+  arg === SELECTED ? '$0' : arg === LOCATION_HOSTNAME ? 'location.hostname' : JSON.stringify(arg);
 export const SELECTED = Symbol('$0');
+const LOCATION_HOSTNAME = Symbol('location.hostname');

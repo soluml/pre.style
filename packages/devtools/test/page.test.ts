@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { call, matchRules, readSelected, SELECTED } from '../src/page.ts';
+import { call, isLocalHost, matchRules, readSelected, SELECTED, whenLocal } from '../src/page.ts';
 import { manifest } from '../src/manifest.ts';
 
 interface Fake {
@@ -124,6 +124,44 @@ describe('call', () => {
     // Sent as text, so a helper from this module would be undefined there.
     const run = new Function(`return ${call(readSelected, null)}`);
     assert.equal(run(), null);
+  });
+});
+
+describe('isLocalHost', () => {
+  test('accepts this computer', () => {
+    for (const host of ['localhost', 'app.localhost', '127.0.0.1', '127.1.2.3', '[::1]', '0.0.0.0'])
+      assert.equal(isLocalHost(host), true, host);
+  });
+
+  test('rejects everything else, including lookalikes', () => {
+    for (const host of [
+      'example.com',
+      'localhost.example.com',
+      'notlocalhost',
+      '127.0.0.1.example.com',
+      '127.0.0',
+      '192.168.1.5',
+      'app.test',
+      '',
+    ])
+      assert.equal(isLocalHost(host), false, host);
+  });
+});
+
+const runWhenLocal = (hostname: string) => {
+  const calls: string[] = [];
+  const hit = () => calls.push('hit');
+  const result = new Function('location', 'hit', `return ${whenLocal('hit()')}`)({ hostname }, hit);
+  return { result, calls };
+};
+
+describe('whenLocal', () => {
+  test('runs the expression on a local page', () => {
+    assert.deepEqual(runWhenLocal('localhost'), { result: true, calls: ['hit'] });
+  });
+
+  test('never runs it on another site', () => {
+    assert.deepEqual(runWhenLocal('example.com'), { result: false, calls: [] });
   });
 });
 
