@@ -12,6 +12,7 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 - **Pseudo-elements:** rules for `::before` and the like, each in its own group.
 - **Not applied right now:** rules from the element's classes that don't apply at the moment, such as `:hover` or a media query that doesn't match.
 - **Sources:** every place each rule is used. Click one to open it in your editor.
+- **Order of sources:** files using the most of the element's classes come first, since they're the most likely to have produced it, then alphabetically. This is a best guess: a file with many blocks can rank high too.
 - **Filter:** searches selectors, declarations, at-rules, and file paths.
 
 ## Requirements

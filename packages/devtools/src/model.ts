@@ -78,12 +78,35 @@ const matchesFilter = (rule: Rule, filter: string) =>
     ...rule.sources.map((source) => source.path),
   ].some((text) => text.toLowerCase().includes(filter));
 
+// Puts the files most likely to have produced the element first: those using the
+// most of its classes, then by path, so the order doesn't depend on what compiled
+// first. It's a guess, since a file with many blocks can score well too.
+function rankSources(rules: Rule[], owned: Set<string>): Rule[] {
+  const scores = new Map<string, number>();
+  for (const rule of rules) {
+    if (!owned.has(rule.className)) continue;
+    for (const file of new Set(rule.sources.map((source) => source.file)))
+      scores.set(file, (scores.get(file) ?? 0) + 1);
+  }
+  const score = (source: Source) => scores.get(source.file) ?? 0;
+  return rules.map((rule) => ({
+    ...rule,
+    sources: rule.sources.toSorted(
+      (a, b) =>
+        score(b) - score(a) ||
+        (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) ||
+        a.line - b.line ||
+        a.column - b.column,
+    ),
+  }));
+}
+
 export function buildView(rules: Rule[], matched: boolean[], own: string[], filter: string): View {
   const owned = new Set(own);
   const normal: Rule[] = [];
   const pseudo = new Map<string, Rule[]>();
   const inactive: Rule[] = [];
-  rules.forEach((rule, index) => {
+  rankSources(rules, owned).forEach((rule, index) => {
     if (!matched[index]) {
       // Rules from other elements' classes only matter if they reach this one.
       if (owned.has(rule.className)) inactive.push(rule);

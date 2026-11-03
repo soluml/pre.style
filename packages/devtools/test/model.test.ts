@@ -171,6 +171,106 @@ describe('buildView', () => {
   });
 });
 
+const source = (name: string, line = 1) => ({
+  file: `/app/${name}`,
+  path: name,
+  line,
+  column: 1,
+});
+
+const sourceOrder = (rules: Rule[], own: string[], matched = rules.map(() => true)) => {
+  const view = buildView(rules, matched, own, '');
+  return Object.fromEntries(
+    [...view.applied, ...view.inactive].map(({ className, sources }) => [
+      className,
+      sources.map(({ path, line }) => `${path}:${line}`),
+    ]),
+  );
+};
+
+describe('source order', () => {
+  test('files using more of the element’s classes come first', () => {
+    const shared = source('a-shared.tsx');
+    const button = source('z-button.tsx');
+    const result = sourceOrder(
+      [
+        rule({ className: 'x', sources: [shared, button] }),
+        rule({ className: 'y', property: 'margin-top', sources: [button] }),
+      ],
+      ['x', 'y'],
+    );
+    assert.deepEqual(result.x, ['z-button.tsx:1', 'a-shared.tsx:1']);
+  });
+
+  test('ties are alphabetical, then by position, whatever compiled first', () => {
+    const result = sourceOrder(
+      [
+        rule({
+          className: 'x',
+          sources: [source('b.tsx'), source('a.tsx', 9), source('a.tsx', 2)],
+        }),
+      ],
+      ['x'],
+    );
+    assert.deepEqual(result.x, ['a.tsx:2', 'a.tsx:9', 'b.tsx:1']);
+  });
+
+  test('several usages of a class in one file count once', () => {
+    const result = sourceOrder(
+      [
+        rule({
+          className: 'x',
+          sources: [source('a.tsx', 1), source('a.tsx', 2), source('b.tsx')],
+        }),
+        rule({ className: 'y', property: 'margin-top', sources: [source('b.tsx')] }),
+      ],
+      ['x', 'y'],
+    );
+    assert.deepEqual(result.x, ['b.tsx:1', 'a.tsx:1', 'a.tsx:2']);
+  });
+
+  test('classes that do not apply right now count, and other elements’ classes do not', () => {
+    const result = sourceOrder(
+      [
+        rule({ className: 'x', sources: [source('a.tsx'), source('b.tsx')] }),
+        rule({
+          className: 'hover',
+          selector: '.hover:hover',
+          property: 'margin-top',
+          sources: [source('b.tsx')],
+        }),
+        rule({
+          className: 'parent',
+          selector: '.parent > *',
+          property: 'margin-left',
+          sources: [source('a.tsx')],
+        }),
+        rule({
+          className: 'parent2',
+          selector: '.parent2 > *',
+          property: 'margin-right',
+          sources: [source('a.tsx')],
+        }),
+      ],
+      ['x', 'hover'],
+      [true, false, true, true],
+    );
+    assert.deepEqual(result.x, ['b.tsx:1', 'a.tsx:1']);
+  });
+
+  test('a filter does not change the order', () => {
+    const rules = [
+      rule({ className: 'x', sources: [source('a.tsx'), source('b.tsx')] }),
+      rule({ className: 'y', property: 'margin-top', sources: [source('b.tsx')] }),
+    ];
+    const view = buildView(rules, [true, true], ['x', 'y'], 'color');
+    assert.deepEqual(
+      view.applied[0].sources.map(({ path }) => path),
+      ['b.tsx', 'a.tsx'],
+    );
+  });
+});
+
 describe('helpers', () => {
   test('classesToFetch dedupes, sorts, and drops names that need escaping', () => {
     assert.deepEqual(classesToFetch(['b', 'a'], ['a', 'c', 'w-[1px]']), ['a', 'b', 'c']);
