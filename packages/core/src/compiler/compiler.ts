@@ -18,11 +18,12 @@ import type {
 } from './block.ts';
 import { print } from './print.ts';
 import type { Printed } from './print.ts';
-import { lvhfaRank, withClass } from './selectors.ts';
+import { lvhfaRank, specificity, withClass } from './selectors.ts';
 import { KEYFRAMES_PREFIX } from './keyframes.ts';
 import { MARKER_PREFIX, markerKey, parseStylesheet } from './stylesheet.ts';
 import type { ParsedStylesheet } from './stylesheet.ts';
 import type { CnTable } from '../cn.ts';
+import { SHORTHANDS } from '../shorthands.ts';
 
 // Files prepended to blocks: an array for every block, or separate arrays
 // for `css` and `scss` blocks.
@@ -105,6 +106,10 @@ interface AtomRecord {
   order: number;
   // The first place the atom appears, for the source map.
   source: Source | null;
+  // Every place the atom appears, when `sourceMap` is on, by location.
+  sources: Map<string, Source>;
+  // Its rule as text, once `usages` has asked for it.
+  printed: string | null;
 }
 
 interface GlobalRecord {
@@ -113,10 +118,28 @@ interface GlobalRecord {
   source: Source | null;
 }
 
-interface Source {
+export interface Source {
   file: string;
   line: number;
   column: number;
+}
+
+// An atomic class as it's written to the output, and everywhere it's used,
+// for tools that trace a class back to its blocks.
+export interface ClassUsage {
+  className: string;
+  selector: string;
+  // Outermost first, such as `@media (min-width: 768px)`.
+  atRules: string[];
+  declaration: string;
+  property: string;
+  // The longhands the property covers, if it's a shorthand.
+  covers: string[];
+  important: boolean;
+  specificity: [ids: number, classes: number, types: number];
+  // Its position in the output, for the cascade.
+  order: number;
+  sources: Source[];
 }
 
 const RANGES = {
@@ -287,6 +310,34 @@ export class Compiler {
     } catch (error) {
       throw error instanceof PreStyleError ? locate(error, fileBlock(sheet.file)) : error;
     }
+  }
+
+  // Where each of the given classes is used, in output order. Classes that
+  // aren't in the output are left out. Sources are only kept with `sourceMap`
+  // on, and only list what has been compiled so far.
+  usages(classNames: Iterable<string>): ClassUsage[] {
+    const wanted = new Set(classNames);
+    const usages: ClassUsage[] = [];
+    let order = 0;
+    const walk = (group: Group) => {
+      for (const record of sortAtoms(group.atoms)) {
+        order++;
+        if (record.className !== null && wanted.has(record.className))
+          usages.push(this.#usage(record, order));
+      }
+      for (const child of sortGroups([...group.children.values()])) walk(child);
+    };
+    walk(this.#atomGroups());
+    return usages;
+  }
+
+  // Drops the places a file uses atoms, because it changed. They're added back
+  // as its blocks are compiled again. The atoms stay, like the rest of dev's
+  // output, which only grows.
+  forgetSources(file: string): void {
+    for (const record of this.#atoms.values())
+      for (const [key, source] of record.sources)
+        if (source.file === file) record.sources.delete(key);
   }
 
   // Each class of a stylesheet file, with its class string.
@@ -570,14 +621,21 @@ export class Compiler {
   #register(block: Block, parsed: ParsedBlock) {
     for (const atom of parsed.atoms) {
       const key = atomKey(atom);
-      if (!this.#atoms.has(key)) {
-        this.#atoms.set(key, {
+      const source = sourceOf(block, atom.position);
+      let record = this.#atoms.get(key);
+      if (record === undefined) {
+        record = {
           atom,
           className: null,
           order: this.#order++,
-          source: sourceOf(block, atom.position),
-        });
+          source,
+          sources: new Map(),
+          printed: null,
+        };
+        this.#atoms.set(key, record);
       }
+      if (source !== null && this.#options.sourceMap)
+        record.sources.set(`${source.file}:${source.line}:${source.column}`, source);
     }
     for (const global of parsed.globals) {
       if (this.#globals.has(global.key)) continue;
@@ -599,8 +657,8 @@ export class Compiler {
     return (record.className ??= this.#names.atoms.set(atomKey(record.atom)));
   }
 
-  #atomRules(loc: (source: Source | null) => unknown): Rule[] {
-    // Group atoms by their at-rules, nesting groups the same way.
+  // Atoms grouped by their at-rules, nesting groups the same way.
+  #atomGroups(): Group {
     const root: Group = { segment: null, order: 0, atoms: [], children: new Map() };
     for (const record of this.#atoms.values()) {
       let group = root;
@@ -614,25 +672,38 @@ export class Compiler {
       }
       group.atoms.push(record);
     }
+    return root;
+  }
 
+  #atomSelectors(record: AtomRecord): SelectorList {
+    const { atom } = record;
+    const className = this.#nameOf(record);
+    const selectors: SelectorList = atom.variant
+      ? withClass(atom.variant.selectors, className)
+      : [[{ type: 'class', name: className }]];
+    return atom.variant?.key.includes(MARKER_KEY) ? this.#named(selectors) : selectors;
+  }
+
+  #atomRule(record: AtomRecord, loc: unknown): Rule {
+    const { atom } = record;
+    const value = atom.declaration.key.includes(KEYFRAMES_KEY)
+      ? this.#named(atom.declaration.value)
+      : atom.declaration.value;
+    const declarations = atom.declaration.important
+      ? { importantDeclarations: [value] }
+      : { declarations: [value] };
+    return {
+      type: 'style',
+      value: { selectors: this.#atomSelectors(record), declarations, rules: [], loc },
+    } as Rule;
+  }
+
+  #atomRules(loc: (source: Source | null) => unknown): Rule[] {
     const emit = (group: Group): Rule[] => {
       const rules: Rule[] = sortAtoms(group.atoms).map((record) => {
-        const { atom, source } = record;
-        const className = this.#nameOf(record);
-        let selectors: SelectorList = atom.variant
-          ? withClass(atom.variant.selectors, className)
-          : [[{ type: 'class', name: className }]];
-        if (atom.variant?.key.includes(MARKER_KEY)) selectors = this.#named(selectors);
-        const value = atom.declaration.key.includes(KEYFRAMES_KEY)
-          ? this.#named(atom.declaration.value)
-          : atom.declaration.value;
-        const declarations = atom.declaration.important
-          ? { importantDeclarations: [value] }
-          : { declarations: [value] };
-        return {
-          type: 'style',
-          value: { selectors, declarations, rules: [], loc: loc(source) },
-        } as Rule;
+        // The first place it's still used, since `forgetSources` drops places.
+        const [source = record.source] = record.sources.values();
+        return this.#atomRule(record, loc(source));
       });
       for (const child of sortGroups([...group.children.values()])) {
         rules.push({
@@ -642,7 +713,38 @@ export class Compiler {
       }
       return rules;
     };
-    return emit(root);
+    return emit(this.#atomGroups());
+  }
+
+  #usage(record: AtomRecord, order: number): ClassUsage {
+    const { atom } = record;
+    const loc = { source_index: 0, line: 0, column: 1 };
+    const rule = this.#atomRule(record, loc);
+    // Printed for reading, so without the user's `minify` and `targets`.
+    const { drafts, nonStandard, errorRecovery } = this.#parseOptions.lightningcss;
+    const text = (rules: Rule) =>
+      print([rules], [], { drafts, nonStandard, errorRecovery }, false).code;
+    const code = (record.printed ??= text(rule));
+    const open = code.indexOf(' {\n');
+    return {
+      className: record.className!,
+      selector: code.slice(0, open).replaceAll('\n', ' '),
+      atRules: atom.atRules.map((segment) => {
+        const wrapped = { ...valueOf(segment.rule), rules: [rule] };
+        const printed = text({ type: segment.rule.type, value: wrapped } as Rule);
+        return printed.slice(0, printed.indexOf(' {\n'));
+      }),
+      declaration: code
+        .slice(open + 3, code.lastIndexOf('\n}'))
+        .trim()
+        .replace(/;$/, ''),
+      property: atom.property,
+      covers: Object.hasOwn(SHORTHANDS, atom.property) ? SHORTHANDS[atom.property] : [],
+      important: atom.declaration.important,
+      specificity: specificity(this.#atomSelectors(record)),
+      order,
+      sources: [...record.sources.values()],
+    };
   }
 }
 

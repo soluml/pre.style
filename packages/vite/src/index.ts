@@ -79,6 +79,10 @@ const RESOLVED_CN_ID = '\0virtual:pre.style/cn';
 // handles it (including HMR).
 const CSS_ID = 'virtual:pre.style.css';
 const RESOLVED_CSS_ID = '/__pre.style.css';
+// Where the browser DevTools extension asks where classes are used, as
+// `?classes=A,B`. Bump the version when the response changes.
+const USAGES_PATH = '/__pre.style/usages';
+const USAGES_VERSION = 1;
 
 const toArray = (value: string | string[] | undefined) =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -348,6 +352,35 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
 
     configureServer(devServer) {
       server = devServer;
+      if (options.sourceMap === false) return;
+      // Vite's host and CORS checks run before this hook's middleware.
+      devServer.middlewares.use(USAGES_PATH, (req, res) => {
+        const classes = new URLSearchParams(req.url?.split('?')[1]).get('classes') ?? '';
+        const usages = compiler?.usages(classes.split(',')) ?? [];
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(
+          JSON.stringify({
+            version: USAGES_VERSION,
+            // `/__open-in-editor` is behind the base, unlike this endpoint.
+            editor: `${config.base}__open-in-editor`,
+            rules: usages.map((usage) => ({
+              ...usage,
+              sources: usage.sources.map((source) => ({
+                ...source,
+                path: relative(config.root, source.file).split(sep).join('/'),
+              })),
+            })),
+          }),
+        );
+      });
+    },
+
+    // Runs before Vite invalidates the file's modules, which add its current
+    // places back as they compile. Once per change, not per transform: an
+    // Astro component's frontmatter and scripts are separate modules.
+    watchChange(file) {
+      if (server !== undefined) compiler?.forgetSources(file);
     },
 
     async buildStart() {

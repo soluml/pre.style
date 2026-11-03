@@ -5,14 +5,15 @@
     "packages/core",
     "packages/vite",
     "packages/vscode",
+    "packages/devtools",
     "demo/react/*",
     "demo/astro"
   ],
   "type": "module",
   "scripts": {
-    "build": "npm run build -w packages/core -w packages/vite -w packages/vscode",
-    "typecheck": "npm run typecheck -w packages/core -w packages/vite -w packages/vscode",
-    "test": "npm test -w packages/core -w packages/vite -w packages/vscode",
+    "build": "npm run build -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
+    "typecheck": "npm run typecheck -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
+    "test": "npm test -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

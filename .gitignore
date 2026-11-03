@@ -14,6 +14,8 @@ packages/*/README.md
 packages/*/LICENSE
 # The VS Code extension has its own README
 !packages/vscode/README.md
+# So does the browser DevTools extension
+!packages/devtools/README.md
 
 # Packaged VS Code extension
 *.vsix

@@ -704,6 +704,129 @@ describe('sourceMap option', () => {
   });
 });
 
+const blockIn = (file: string, line: number, code: string) => ({
+  code,
+  lang: 'css' as const,
+  file,
+  line,
+  column: 9,
+});
+
+describe('usages', () => {
+  test('lists every place a class is used, once each', async () => {
+    const compiler = await createCompiler({ sourceMap: true });
+    const a = blockIn('/src/A.tsx', 5, 'color: red');
+    compiler.classString(a);
+    compiler.classString(a);
+    compiler.classString(blockIn('/src/B.tsx', 2, 'color: red'));
+    compiler.css();
+    assert.deepEqual(compiler.usages(['A']), [
+      {
+        className: 'A',
+        selector: '.A',
+        atRules: [],
+        declaration: 'color: red',
+        property: 'color',
+        covers: [],
+        important: false,
+        specificity: [0, 1, 0],
+        order: 1,
+        sources: [
+          { file: '/src/A.tsx', line: 5, column: 9 },
+          { file: '/src/B.tsx', line: 2, column: 9 },
+        ],
+      },
+    ]);
+  });
+
+  test('describes selectors, at-rules, and shorthands', async () => {
+    const compiler = await createCompiler({
+      sourceMap: true,
+      lightningcss: { minify: true },
+    });
+    const names = compiler
+      .classString(
+        blockIn(
+          '/src/A.tsx',
+          1,
+          `@media (min-width: 768px) { @supports (display: grid) { .dark &:hover { color: red !important } } }
+           border: 1px solid var(--c);`,
+        ),
+      )
+      .split(' ');
+    compiler.css();
+    const usages = compiler.usages(names);
+    const border = usages.find((usage) => usage.property === 'border')!;
+    assert.equal(border.declaration, 'border: 1px solid var(--c)');
+    assert.ok(border.covers.includes('border-top-color'));
+    const color = usages.find((usage) => usage.property === 'color')!;
+    assert.deepEqual(color.atRules, ['@media (width >= 768px)', '@supports (display: grid)']);
+    assert.equal(color.selector, `.dark .${color.className}:hover`);
+    assert.equal(color.declaration, 'color: red !important');
+    assert.equal(color.important, true);
+    assert.deepEqual(color.specificity, [0, 3, 0]);
+    assert.ok(color.order > border.order);
+  });
+
+  test('counts specificity through :is, :where, and pseudo-elements', async () => {
+    const compiler = await createCompiler();
+    const names = compiler
+      .classString({
+        code: `:is(#a, .b) &::before { color: red } :where(#a) & { margin-top: 0 }`,
+        lang: 'css',
+      })
+      .split(' ');
+    compiler.css();
+    const usages = compiler.usages(names);
+    assert.deepEqual(usages.find((u) => u.property === 'color')!.specificity, [1, 1, 1]);
+    assert.deepEqual(usages.find((u) => u.property === 'margin-top')!.specificity, [0, 1, 0]);
+  });
+
+  test('skips names that are not in the output', async () => {
+    const compiler = await createCompiler();
+    compiler.classString({ code: 'color: red', lang: 'css' });
+    assert.deepEqual(compiler.usages(['nope']), []);
+  });
+
+  test('keeps only the first source when sourceMap is off', async () => {
+    const compiler = await createCompiler();
+    compiler.classString(blockIn('/src/A.tsx', 5, 'color: red'));
+    compiler.css();
+    assert.deepEqual(compiler.usages(['A'])[0].sources, []);
+  });
+
+  test('forgetSources drops a changed file until it compiles again', async () => {
+    const compiler = await createCompiler({ sourceMap: true });
+    compiler.classString(blockIn('/src/A.tsx', 5, 'color: red'));
+    compiler.classString(blockIn('/src/B.tsx', 2, 'color: red'));
+    compiler.css();
+    compiler.forgetSources('/src/A.tsx');
+    assert.deepEqual(
+      compiler.usages(['A'])[0].sources.map((source) => source.file),
+      ['/src/B.tsx'],
+    );
+    // The source map follows, to the first place it's still used.
+    assert.deepEqual(JSON.parse(compiler.css().map!).sources, ['/src/B.tsx']);
+    compiler.classString(blockIn('/src/A.tsx', 8, 'color: red'));
+    assert.deepEqual(
+      compiler.usages(['A'])[0].sources.map(({ file, line }) => `${file}:${line}`),
+      ['/src/B.tsx:2', '/src/A.tsx:8'],
+    );
+  });
+
+  test('stylesheet classes list their file', async () => {
+    const compiler = await createCompiler({ sourceMap: true });
+    const { exports } = compiler.stylesheet({
+      code: '.button { color: red }',
+      lang: 'css',
+      file: '/src/button.css',
+    });
+    compiler.css();
+    const [usage] = compiler.usages([exports[0][1]]);
+    assert.equal(usage.sources[0].file, '/src/button.css');
+  });
+});
+
 describe('layer option', () => {
   test('wraps the output in a named layer, with @import outside it', async () => {
     const compiler = await createCompiler({ layer: 'pre.style' });
