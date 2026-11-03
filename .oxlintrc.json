@@ -10,5 +10,5 @@
     "builtin": true,
     "node": true
   },
-  "ignorePatterns": ["docs/", "src/www/", "**/dist/"]
+  "ignorePatterns": ["docs/", "www/", "**/dist/"]
 }

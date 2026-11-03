@@ -1,13 +1,13 @@
 name: Website
 
-# Builds src/www with the published pre.style packages, and deploys it to
+# Builds www with the published pre.style packages, and deploys it to
 # GitHub Pages from main. Pull requests only build it.
 on:
   push:
     branches: [main]
-    paths: ['src/www/**', '.github/workflows/www.yml']
+    paths: ['www/**', '.github/workflows/www.yml']
   pull_request:
-    paths: ['src/www/**', '.github/workflows/www.yml']
+    paths: ['www/**', '.github/workflows/www.yml']
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ concurrency:
 
 defaults:
   run:
-    working-directory: src/www
+    working-directory: www
 
 jobs:
   build:
@@ -30,13 +30,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: src/www/package-lock.json
+          cache-dependency-path: www/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: src/www/dist
+          path: www/dist
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
