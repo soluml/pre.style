@@ -353,6 +353,10 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
     configureServer(devServer) {
       server = devServer;
       if (options.sourceMap === false) return;
+      // The DevTools extension opens files through Vite's `/__open-in-editor`,
+      // whose guess can pick a terminal editor in the dev server's terminal.
+      // Elsewhere, the guess is left alone.
+      if (process.env.TERM_PROGRAM === 'vscode') process.env.LAUNCH_EDITOR ||= 'code';
       // Vite's host and CORS checks run before this hook's middleware.
       devServer.middlewares.use(USAGES_PATH, (req, res) => {
         const classes = new URLSearchParams(req.url?.split('?')[1]).get('classes') ?? '';

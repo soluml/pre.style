@@ -656,6 +656,36 @@ describe('dev', () => {
     }
   });
 
+  test('LAUNCH_EDITOR defaults to VS Code in its terminal, unless it is set or sourceMap is off', async () => {
+    const original = {
+      LAUNCH_EDITOR: process.env.LAUNCH_EDITOR,
+      TERM_PROGRAM: process.env.TERM_PROGRAM,
+    };
+    const editorAfter = async (options: PreStyleOptions) => {
+      const server = await createServer({
+        ...config('basic', options),
+        server: { middlewareMode: true, ws: false },
+      });
+      await server.close();
+      return process.env.LAUNCH_EDITOR;
+    };
+    try {
+      delete process.env.LAUNCH_EDITOR;
+      process.env.TERM_PROGRAM = 'other';
+      assert.equal(await editorAfter({}), undefined);
+      process.env.TERM_PROGRAM = 'vscode';
+      assert.equal(await editorAfter({ sourceMap: false }), undefined);
+      assert.equal(await editorAfter({}), 'code');
+      process.env.LAUNCH_EDITOR = 'webstorm';
+      assert.equal(await editorAfter({}), 'webstorm');
+    } finally {
+      for (const [name, value] of Object.entries(original)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
   test('sourceMap: false leaves out the usages endpoint', async () => {
     const server = await createServer({
       ...config('basic', { sourceMap: false }),

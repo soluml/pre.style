@@ -35,4 +35,4 @@ Run `npm run build -w packages/devtools`, which writes one folder per browser to
 - **Only pre.style's rules:** global rules (`:root`, `body`), other stylesheets, inline styles, and inherited properties aren't listed. Crossed-out rules only consider other pre.style rules, so the Styles pane is still the word on the full cascade.
 - **Layers:** `@layer` order is approximated by output order.
 - **Conditions it can't check:** rules in `@container` and similar at-rules count as applied.
-- **Opening files** uses Vite's `/__open-in-editor` route. Set the `LAUNCH_EDITOR` environment variable if it opens the wrong editor.
+- **Opening files** uses Vite's `/__open-in-editor` route. When the dev server runs in VS Code's terminal, the plugin defaults the `LAUNCH_EDITOR` environment variable to `code`. Elsewhere, Vite guesses your editor, so set `LAUNCH_EDITOR` yourself if it opens the wrong one.
