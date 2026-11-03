@@ -1,10 +1,12 @@
 export { Compiler, createCompiler } from './compiler.ts';
 export type {
   Block,
+  ClassUsage,
   CompiledStylesheet,
   CompilerOptions,
   Library,
   PrependFiles,
+  Source,
   Stylesheet,
 } from './compiler.ts';
 export { PreStyleError } from './block.ts';

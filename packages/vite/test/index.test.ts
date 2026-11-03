@@ -620,6 +620,86 @@ describe('dev', () => {
     }
   });
 
+  test('the usages endpoint lists where classes are used', async () => {
+    const server = await createServer({
+      ...config('basic', {}),
+      server: { port: 0, ws: false },
+    });
+    try {
+      await server.listen();
+      const url = server.resolvedUrls!.local[0];
+      await server.transformRequest('/src/main.ts');
+      const css = await server.transformRequest('/__pre.style.css');
+      const className = /\.([\w-]+) ?\{/.exec(css!.code)![1];
+      const response = await fetch(`${url}__pre.style/usages?classes=${className},nope`);
+      assert.match(response.headers.get('content-type')!, /application\/json/);
+      const { version, editor, rules } = await response.json();
+      assert.equal(version, 1);
+      assert.equal(editor, '/__open-in-editor');
+      assert.equal(rules.length, 1);
+      assert.equal(rules[0].className, className);
+      assert.equal(rules[0].sources[0].file, `${fixture('basic')}/src/main.ts`);
+      assert.equal(rules[0].sources[0].path, 'src/main.ts');
+
+      // A changed file's places are dropped until it compiles again.
+      await server.environments.client.pluginContainer.watchChange(
+        `${fixture('basic')}/src/main.ts`,
+        { event: 'update' },
+      );
+      const updated = await fetch(`${url}__pre.style/usages?classes=${className}`);
+      const files = (await updated.json()).rules[0].sources.map(
+        ({ path }: { path: string }) => path,
+      );
+      assert.equal(files.includes('src/main.ts'), false);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('LAUNCH_EDITOR defaults to VS Code in its terminal, unless it is set or sourceMap is off', async () => {
+    const original = {
+      LAUNCH_EDITOR: process.env.LAUNCH_EDITOR,
+      TERM_PROGRAM: process.env.TERM_PROGRAM,
+    };
+    const editorAfter = async (options: PreStyleOptions) => {
+      const server = await createServer({
+        ...config('basic', options),
+        server: { middlewareMode: true, ws: false },
+      });
+      await server.close();
+      return process.env.LAUNCH_EDITOR;
+    };
+    try {
+      delete process.env.LAUNCH_EDITOR;
+      process.env.TERM_PROGRAM = 'other';
+      assert.equal(await editorAfter({}), undefined);
+      process.env.TERM_PROGRAM = 'vscode';
+      assert.equal(await editorAfter({ sourceMap: false }), undefined);
+      assert.equal(await editorAfter({}), 'code');
+      process.env.LAUNCH_EDITOR = 'webstorm';
+      assert.equal(await editorAfter({}), 'webstorm');
+    } finally {
+      for (const [name, value] of Object.entries(original)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
+  test('sourceMap: false leaves out the usages endpoint', async () => {
+    const server = await createServer({
+      ...config('basic', { sourceMap: false }),
+      server: { port: 0, ws: false },
+    });
+    try {
+      await server.listen();
+      const response = await fetch(`${server.resolvedUrls!.local[0]}__pre.style/usages?classes=A`);
+      assert.doesNotMatch(response.headers.get('content-type') ?? '', /application\/json/);
+    } finally {
+      await server.close();
+    }
+  });
+
   test('sourceMap: false turns the source map off', async () => {
     const server = await createServer({
       ...config('basic', { sourceMap: false }),

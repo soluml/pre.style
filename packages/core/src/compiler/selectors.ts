@@ -134,3 +134,44 @@ export function repair<T>(selectors: T): T {
   };
   return fix(selectors) as T;
 }
+
+type Specificity = [ids: number, classes: number, types: number];
+
+// A selector list's specificity: its most specific selector's.
+export function specificity(selectors: SelectorList): Specificity {
+  let best: Specificity = [0, 0, 0];
+  for (const selector of selectors) {
+    const current = ofSelector(selector);
+    const difference = current[0] - best[0] || current[1] - best[1] || current[2] - best[2];
+    if (difference > 0) best = current;
+  }
+  return best;
+}
+
+function ofSelector(selector: Selector): Specificity {
+  const total: Specificity = [0, 0, 0];
+  const add = (other: Specificity) => {
+    total[0] += other[0];
+    total[1] += other[1];
+    total[2] += other[2];
+  };
+  for (const component of selector as {
+    type: string;
+    kind?: string;
+    selectors?: SelectorList;
+    of?: SelectorList;
+  }[]) {
+    if (component.type === 'id') total[0]++;
+    else if (component.type === 'class' || component.type === 'attribute') total[1]++;
+    else if (component.type === 'type' || component.type === 'pseudo-element') total[2]++;
+    else if (component.type === 'pseudo-class' && component.kind !== 'where') {
+      // `:is()`, `:not()`, and `:has()` count as their most specific argument.
+      if (component.selectors) add(specificity(component.selectors));
+      else {
+        total[1]++;
+        if (component.of) add(specificity(component.of));
+      }
+    }
+  }
+  return total;
+}

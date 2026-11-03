@@ -1,0 +1,28 @@
+{
+  "name": "pre.style-devtools",
+  "version": "3.1.0",
+  "private": true,
+  "description": "A side pane for the browser's Elements panel that traces each pre.style class back to every block that uses it.",
+  "homepage": "https://pre.style",
+  "bugs": {
+    "url": "https://github.com/soluml/pre.style/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soluml/pre.style/",
+    "directory": "packages/devtools"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "typecheck": "tsc",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
