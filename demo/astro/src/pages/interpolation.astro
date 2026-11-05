@@ -1,45 +1,43 @@
 ---
-import { Counter } from 'pre.style-demo-react-ui';
+import { ColorPicker, StyleCounter } from 'pre.style-demo-react-ui';
 import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="Interpolation">
   <h1>Interpolation</h1>
   <p>
-    These counts are set with <code>{'${…}'}</code> in a block, and shown by its
-    <code>&amp;::before</code>. Each value becomes a generated class that sets a custom property,
-    using pre.style's small runtime. Blocks without <code>{'${…}'}</code> don't use it.
+    There are two ways to set a value at runtime. They suit different values, and the class shown
+    under each example shows the difference.
   </p>
-  <h2>In a client script</h2>
-  <p id="count"></p>
-  <h2>In a React island</h2>
-  <Counter client:load />
+  <h2><code>{'${…}'}</code>, for values from a small set</h2>
+  <p>
+    Each distinct value gets its own generated class and rule, so the class changes with the value.
+    Going back to a color reuses its class. It works with <code>cn</code>, but each new value adds a
+    rule that's never removed. The server renders the block's default until the runtime takes over
+    in the browser.
+  </p>
+  <ColorPicker client:load />
+  <h3>In a client script</h3>
   <p>
     A frontmatter or template block can't use <code>{'${…}'}</code>: that code only runs on the
-    server, so nothing could set the value in the browser. Each new value adds a rule that's never
-    removed, so for values that change this often, a real app would use <code>style</code> instead.
+    server, so nothing could set the value in the browser. A client script can.
   </p>
+  <p id="visits"></p>
+  <h2><code>style</code>, for values that change constantly</h2>
+  <p>
+    The block is static and reads a custom property that <code>style</code> sets, so the class never
+    changes, no rules are added, and no runtime is needed. The server renders the real value too.
+  </p>
+  <StyleCounter client:load />
 </Layout>
 
 <script>
   import { css } from '@pre.style/core';
 
-  const element = document.getElementById('count')!;
-  let i = 0;
-
   // Astro bundles this script for the browser, so it can use runtime values.
-  (function inc() {
-    element.className = css`
-      font-size: 3rem;
-      font-variant-numeric: tabular-nums;
-      font-weight: 700;
-      margin: 0;
-
-      &::before {
-        content: var(${JSON.stringify(String(i))}, '0');
-      }
-    `;
-    i++;
-    setTimeout(inc, 1000);
-  })();
+  document.getElementById('visits')!.className = css`
+    &::before {
+      content: 'Set in a script at ${new Date().getFullYear()}';
+    }
+  `;
 </script>

@@ -1,7 +1,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { chromium, firefox, webkit, type Browser, type Page } from 'playwright';
+import { chromium, firefox, webkit, type Browser } from 'playwright';
 
 // Runs the built demos and pre.style's generated CSS in real browser engines.
 // Build the packages and demos first. Playwright's WebKit is close to Safari,
@@ -13,15 +13,14 @@ const root = new URL('../..', import.meta.url).pathname;
 
 // Run in each demo's workspace, so arguments after `--` reach its `start` script.
 const apps = [
-  { dir: 'demo/react/react-router', name: 'react-router', port: 4401, args: [], counters: 1 },
+  { dir: 'demo/react/react-router', name: 'react-router', port: 4401, args: [] },
   {
     dir: 'demo/react/tanstack-start',
     name: 'tanstack-start',
     port: 4402,
     args: ['--', '--port', '4402', '--host', '127.0.0.1', '--strictPort'],
-    counters: 1,
   },
-  { dir: 'demo/astro', name: 'astro', port: 4403, args: [], counters: 2 },
+  { dir: 'demo/astro', name: 'astro', port: 4403, args: [] },
 ];
 
 async function waitFor(url: string) {
@@ -36,19 +35,16 @@ async function waitFor(url: string) {
   throw new Error(`${url} didn't start`);
 }
 
-// The content each counter's `::before` shows.
-const counts = (page: Page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('main p')]
-      .map((p) => getComputedStyle(p, '::before').content)
-      .filter((content) => content !== 'none' && content !== 'normal'),
-  );
-
 describe('demos', () => {
   const servers: ChildProcess[] = [];
 
   before(async () => {
     for (const { dir, port, args } of apps) {
+      // Something left on the port would be tested instead of the new build.
+      const running = await fetch(`http://127.0.0.1:${port}/`, {
+        signal: AbortSignal.timeout(1000),
+      }).catch(() => null);
+      assert.equal(running, null, `Port ${port} is already in use`);
       const server = spawn('npm', ['run', 'start', '-w', dir, ...args], {
         cwd: root,
         detached: true,
@@ -73,8 +69,8 @@ describe('demos', () => {
       });
       after(() => browser.close());
 
-      for (const { name, port, counters } of apps) {
-        test(`${name}: the counter hydrates and counts up`, async () => {
+      for (const { name, port } of apps) {
+        test(`${name}: both ways of setting a value`, async () => {
           const page = await browser.newPage();
           const errors: string[] = [];
           page.on('pageerror', (error) => errors.push(error.message));
@@ -82,20 +78,72 @@ describe('demos', () => {
             if (message.type() === 'error') errors.push(message.text());
           });
           await page.goto(`http://127.0.0.1:${port}/interpolation`);
+
+          const swatch = page.locator('[data-demo=swatch]');
+          const swatchStyle = () =>
+            swatch.evaluate((element) => ({
+              className: element.className,
+              background: getComputedStyle(element).backgroundColor,
+              label: getComputedStyle(element, '::before').content,
+              rules: document.adoptedStyleSheets[0]?.cssRules.length ?? 0,
+            }));
+          // Clicks until it takes effect, since a click can land before hydration.
+          const pick = async (color: string, background: string) => {
+            const button = page.getByRole('button', { name: color });
+            for (let attempt = 0; attempt < 40; attempt++) {
+              await button.click();
+              if ((await swatchStyle()).background === background) return;
+              await page.waitForTimeout(250);
+            }
+            assert.fail(`${color} never took effect`);
+          };
+
+          // `${…}`: the class changes with the value, and a value is reused.
+          await page.waitForFunction(() => document.adoptedStyleSheets.length === 1);
+          const red = await swatchStyle();
+          assert.equal(red.background, 'rgb(221, 51, 51)');
+          assert.equal(red.label, '"Picked: #d33"');
+          await pick('Blue', 'rgb(51, 102, 204)');
+          const blue = await swatchStyle();
+          assert.notEqual(blue.className, red.className);
+          assert.equal(blue.label, '"Picked: #36c"');
+          assert.ok(blue.rules > red.rules);
+          await pick('Red', 'rgb(221, 51, 51)');
+          const again = await swatchStyle();
+          assert.equal(again.className, red.className);
+          assert.equal(again.rules, blue.rules);
+
+          // `style`: the class stays, and no rules are added.
+          const counter = page.locator('[data-demo=counter]');
+          const count = () =>
+            counter.evaluate((element) => ({
+              className: element.className,
+              value: Number(getComputedStyle(element).getPropertyValue('--count')),
+              rules: document.adoptedStyleSheets[0]?.cssRules.length ?? 0,
+            }));
+          const before = await count();
           await page.waitForFunction(
-            (expected) => {
-              const shown = [...document.querySelectorAll('main p')]
-                .map((p) => getComputedStyle(p, '::before').content)
-                .filter((content) => /^"\d+"$/.test(content));
-              return shown.length === expected && shown.every((c) => Number(c.slice(1, -1)) >= 2);
-            },
-            counters,
+            (start) =>
+              Number(
+                getComputedStyle(document.querySelector('[data-demo=counter]')!).getPropertyValue(
+                  '--count',
+                ),
+              ) >=
+              start + 2,
+            before.value,
             { timeout: 15_000 },
           );
-          const shown = await counts(page);
-          assert.equal(shown.length, counters);
-          const sheets = await page.evaluate(() => document.adoptedStyleSheets.length);
-          assert.equal(sheets, 1);
+          const after = await count();
+          assert.equal(after.className, before.className);
+          assert.equal(after.rules, before.rules);
+
+          if (name === 'astro') {
+            const script = await page
+              .locator('#visits')
+              .evaluate((element) => getComputedStyle(element, '::before').content);
+            assert.match(script, /^"Set in a script at \d+"$/);
+          }
+          assert.equal(await page.evaluate(() => document.adoptedStyleSheets.length), 1);
           assert.deepEqual(errors, []);
           await page.close();
         });
@@ -115,6 +163,7 @@ const GENERATED = `
   .typed { width: var(--t); height: 1px; }
   .anim { animation: grow 1000s paused; height: 1px; }
   .before::before { content: var(--a, "default"); }
+  .quoted::before { content: var(--a); }
   .kids > * { width: var(--a, 10px); height: 1px; }
   .next + * { width: var(--a, 10px); height: 1px; }
   .fade { --c: red; transition: --c 1000s linear; color: var(--c); }
@@ -151,6 +200,7 @@ describe('generated CSS', () => {
         set('.kid77 > *', '--a', '77px');
         set('.next77 + *', '--a', '77px');
         set('.typed99', '--t', '99px');
+        set('.escaped::before', '--a', '"say \\22 hi\\22  it\\27 s \\5c "');
 
         const parent = add('w set300');
         add('next next77');
@@ -172,6 +222,7 @@ describe('generated CSS', () => {
           keyframesDefault: width(add('anim')),
           before: getComputedStyle(add('before string'), '::before').content,
           beforeDefault: getComputedStyle(add('before'), '::before').content,
+          escaped: getComputedStyle(add('quoted escaped'), '::before').content,
           child: width(add('', add('kids kid77'))),
           sibling: width(sibling),
           injection: getComputedStyle(document.body).display,
@@ -190,10 +241,11 @@ describe('generated CSS', () => {
         keyframesDefault: '10px',
         before: '"5"',
         beforeDefault: '"default"',
+        escaped: `"say \\"hi\\" it's \\\\"`,
         child: '77px',
         sibling: '77px',
         injection: 'block',
-        injectionRules: 8,
+        injectionRules: 9,
         transitions: 1,
       });
       await browser.close();

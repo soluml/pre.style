@@ -1,4 +1,4 @@
-import { Counter } from 'pre.style-demo-react-ui';
+import { ColorPicker, StyleCounter } from 'pre.style-demo-react-ui';
 import type { Route } from './+types/interpolation';
 
 export const meta: Route.MetaFunction = () => [{ title: 'Interpolation · pre.style demo' }];
@@ -8,17 +8,28 @@ export default function Interpolation() {
     <>
       <h1>Interpolation</h1>
       <p>
-        This count is set with <code>{'${…}'}</code> in a block, and shown by its{' '}
-        <code>&amp;::before</code>. Each value becomes a generated class that sets a custom
-        property, using pre.style's small runtime. Blocks without <code>{'${…}'}</code> don't use
-        it.
+        There are two ways to set a value at runtime. They suit different values, and the class
+        shown under each example shows the difference.
       </p>
-      <Counter />
+      <h2>
+        <code>{'${…}'}</code>, for values from a small set
+      </h2>
       <p>
-        The server renders the default, <code>0</code>, and the runtime takes over in the browser.
-        Each new value adds a rule that's never removed, so for values that change this often, a
-        real app would use <code>style</code> instead.
+        Each distinct value gets its own generated class and rule, so the class changes with the
+        value. Going back to a color reuses its class. It works with <code>cn</code>, but each new
+        value adds a rule that's never removed. The server renders the block's default until the
+        runtime takes over in the browser.
       </p>
+      <ColorPicker />
+      <h2>
+        <code>style</code>, for values that change constantly
+      </h2>
+      <p>
+        The block is static and reads a custom property that <code>style</code> sets, so the class
+        never changes, no rules are added, and no runtime is needed. The server renders the real
+        value too.
+      </p>
+      <StyleCounter />
     </>
   );
 }
