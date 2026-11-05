@@ -420,6 +420,45 @@ An array applies the files to every block. An object applies `css` files only to
 
 Rules the files output, such as `:root { --space: 4px }`, appear in the CSS file once. Keep prepended files to things that don't output CSS, or output it once (variables, mixins, custom properties). Large libraries slow the build down.
 
+### Sharing media queries
+
+Use Sass variables to share media queries. They need `scss` blocks, and they compile to ordinary `@media` rules:
+
+```scss
+// src/styles/_variables.scss, in prependFiles.scss
+$md: 768px;
+```
+
+```js
+scss`
+  flex-direction: column;
+
+  @media (min-width: $md) {
+    flex-direction: row;
+  }
+`;
+```
+
+`@custom-media` isn't resolved by pre.style. It's copied to the output as written, and no browser supports it by default yet, so `@media (--md)` rules don't apply. To use it anyway, pass the output CSS through another tool that resolves it, such as another Lightning CSS run:
+
+```js
+import { Features, transform } from 'lightningcss';
+
+const { code } = transform({
+  filename: 'pre.style.css',
+  code: Buffer.from(css),
+  drafts: { customMedia: true },
+  include: Features.CustomMediaQueries,
+});
+```
+
+or PostCSS with [`postcss-custom-media`](https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-custom-media).
+
+Either way, pre.style has already written the file by then, and it treats an alias as its own query:
+
+- Aliases aren't sorted with `min-width` queries, so an alias for a wider breakpoint can come before a narrower query, which then wins. Check the order of the output.
+- `cn` doesn't treat `(--md)` and the query it stands for as conflicting, so it keeps classes from both.
+
 ## Component libraries
 
 A component library styled with pre.style ships its blocks uncompiled, and each app's pre.style plugin compiles them along with the app's own. The library's classes share names and the CSS file with the app's, so a `color: red` in the library and one in the app are the same class, and `cn` resolves conflicts between them.
