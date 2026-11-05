@@ -81,6 +81,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink to="/cn" className={link}>
               cn
             </NavLink>
+            <NavLink to="/interpolation" className={link}>
+              Interpolation
+            </NavLink>
             <NavLink to="/server" className={link}>
               Server
             </NavLink>

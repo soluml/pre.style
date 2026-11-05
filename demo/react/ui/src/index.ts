@@ -4,4 +4,5 @@
 // share names and the CSS file with the app's own.
 export { Badge } from './Badge';
 export { Button, buttonClass } from './Button';
+export { Counter } from './Counter';
 export type { ButtonVariant } from './Button';

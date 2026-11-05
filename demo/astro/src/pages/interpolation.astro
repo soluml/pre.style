@@ -1,0 +1,45 @@
+---
+import { Counter } from 'pre.style-demo-react-ui';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Interpolation">
+  <h1>Interpolation</h1>
+  <p>
+    These counts are set with <code>{'${…}'}</code> in a block, and shown by its
+    <code>&amp;::before</code>. Each value becomes a generated class that sets a custom property,
+    using pre.style's small runtime. Blocks without <code>{'${…}'}</code> don't use it.
+  </p>
+  <h2>In a client script</h2>
+  <p id="count"></p>
+  <h2>In a React island</h2>
+  <Counter client:load />
+  <p>
+    A frontmatter or template block can't use <code>{'${…}'}</code>: that code only runs on the
+    server, so nothing could set the value in the browser. Each new value adds a rule that's never
+    removed, so for values that change this often, a real app would use <code>style</code> instead.
+  </p>
+</Layout>
+
+<script>
+  import { css } from '@pre.style/core';
+
+  const element = document.getElementById('count')!;
+  let i = 0;
+
+  // Astro bundles this script for the browser, so it can use runtime values.
+  (function inc() {
+    element.className = css`
+      font-size: 3rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      margin: 0;
+
+      &::before {
+        content: var(${JSON.stringify(String(i))}, '0');
+      }
+    `;
+    i++;
+    setTimeout(inc, 1000);
+  })();
+</script>

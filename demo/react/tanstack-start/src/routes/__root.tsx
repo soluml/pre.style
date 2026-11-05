@@ -80,6 +80,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             <Link to="/cn" className={link}>
               cn
             </Link>
+            <Link to="/interpolation" className={link}>
+              Interpolation
+            </Link>
             <Link to="/server" className={link}>
               Server
             </Link>
