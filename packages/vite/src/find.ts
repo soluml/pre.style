@@ -10,6 +10,12 @@ export interface FoundBlock {
   // Where the block's code starts, from 1.
   line: number;
   column: number;
+  // For a block with `${…}`: the text around its expressions, and where each
+  // expression is.
+  interpolation?: {
+    strings: string[];
+    expressions: { start: number; end: number; code: string; line: number; column: number }[];
+  };
 }
 
 export interface FoundImport {
@@ -364,29 +370,42 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
       );
     }
     const { quasi } = parent;
-    if (quasi.expressions.length > 0) {
-      const { line, column } = locate(quasi.expressions[0].start);
-      throw new FindError(
-        'Blocks cannot contain ${…} interpolation. Use prepended files for shared values.',
-        line,
-        column,
-      );
-    }
     // The block's code starts after the opening backtick.
     const { line, column } = locate(quasi.start + 1);
     const block: FoundBlock = {
       start: parent.start,
       end: parent.end,
-      code: quasi.quasis[0].value.raw,
+      code: code.slice(quasi.start + 1, quasi.end - 1),
       lang: imported as Lang,
       line,
       column,
     };
+    if (quasi.expressions.length > 0)
+      block.interpolation = {
+        strings: (quasi.quasis as Node[]).map((element) => element.value.raw),
+        expressions: (quasi.expressions as Node[]).map((expression) => ({
+          start: expression.start,
+          end: expression.end,
+          code: code.slice(expression.start, expression.end),
+          ...locate(expression.start),
+        })),
+      };
     blocks.push(block);
     blockAt.set(parent, block);
   });
 
   if (locals.size === 0 && sheets.length === 0) return null;
+
+  // A block's class string isn't a value for another block's `${…}`.
+  for (const { interpolation } of blocks)
+    for (const expression of interpolation?.expressions ?? [])
+      for (const inner of blocks)
+        if (expression.start <= inner.start && inner.end <= expression.end)
+          throw new FindError(
+            "A block can't be used in another block's `${…}`. To combine blocks, use `cn`.",
+            inner.line,
+            inner.column,
+          );
 
   // The stylesheet import a local name is bound to.
   const find = (local: string) => sheets.find((sheet) => sheet.locals.has(local));
@@ -452,7 +471,8 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
       if (arg.type === 'Literal' && typeof arg.value === 'string') args.push(arg.value);
       else if (arg.type === 'TemplateLiteral' && arg.expressions.length === 0)
         args.push(arg.quasis[0].value.cooked);
-      else if (blockAt.has(arg)) args.push(blockAt.get(arg)!);
+      // A block with `${…}` isn't known until it runs.
+      else if (blockAt.has(arg) && !blockAt.get(arg)!.interpolation) args.push(blockAt.get(arg)!);
       else if (sheet !== null) args.push(sheet);
       // Only through a `const`: a call written inside another isn't
       // replaced separately.

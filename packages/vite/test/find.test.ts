@@ -146,3 +146,29 @@ const early = css\`color: blue;\`;
     });
   });
 });
+
+const find = (code: string) =>
+  findInScript('test.ts', `import { css, cn } from '@pre.style/core';\n${code}`)!;
+
+describe('blocks with runtime values', () => {
+  test('keep the text and expressions', () => {
+    const [found] = find('const a = css`width: ${w + 1}px; color: ${c};`;').blocks;
+    assert.deepEqual(found.interpolation!.strings, ['width: ', 'px; color: ', ';']);
+    assert.deepEqual(
+      found.interpolation!.expressions.map((e) => e.code),
+      ['w + 1', 'c'],
+    );
+    assert.equal(found.code, 'width: ${w + 1}px; color: ${c};');
+  });
+
+  test("aren't resolved in `cn` at build time", () => {
+    const { cnCalls } = find('cn(css`width: ${w}px;`, css`color: red;`);');
+    assert.equal(cnCalls[0].args, null);
+    const named = find('const a = css`width: ${w}px;`;\ncn(a);');
+    assert.equal(named.cnCalls[0].args, null);
+  });
+
+  test('blocks without values have no interpolation', () => {
+    assert.equal(find('css`color: red;`').blocks[0].interpolation, undefined);
+  });
+});

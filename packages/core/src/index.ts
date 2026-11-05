@@ -7,11 +7,14 @@ function notTransformed(): never {
   );
 }
 
-export function css(_strings: TemplateStringsArray): string {
+// What a `${…}` can hold. `null` and `undefined` use the block's default.
+export type RuntimeValue = string | number | null | undefined;
+
+export function css(_strings: TemplateStringsArray, ..._values: RuntimeValue[]): string {
   return notTransformed();
 }
 
-export function scss(_strings: TemplateStringsArray): string {
+export function scss(_strings: TemplateStringsArray, ..._values: RuntimeValue[]): string {
   return notTransformed();
 }
 

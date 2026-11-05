@@ -1,12 +1,12 @@
 import type { CnLookup } from './cn.ts';
 
 // What the bundler plugin passes for each variable a block sets: its short
-// name, the text around its values, its values, and the custom property it
-// sets, when that isn't `--<name>`.
+// name, the text around its values, which of the block's values they are, and
+// the custom property it sets, when that isn't `--<name>`.
 export type RuntimeVariable = [
   name: string,
   strings: readonly string[],
-  values: readonly unknown[],
+  indexes: readonly number[],
   property?: string,
 ];
 
@@ -41,13 +41,14 @@ export type InvalidValue = (value: unknown, strings: readonly string[]) => never
 // back would hide.
 function text(
   strings: readonly string[],
+  indexes: readonly number[],
   values: readonly unknown[],
   invalid: InvalidValue,
 ): string | null {
   let result = strings[0];
   let missing = false;
-  for (let i = 0; i < values.length; i++) {
-    const value = values[i];
+  for (let i = 0; i < indexes.length; i++) {
+    const value = values[indexes[i]];
     if (value === null || value === undefined) missing = true;
     else if (typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)))
       result += value + strings[i + 1];
@@ -74,10 +75,10 @@ function insert(className: string, property: string, value: string) {
 
 export const create =
   (alphabet: string, invalid: InvalidValue) =>
-  (classes: string, ...variables: RuntimeVariable[]): string => {
+  (classes: string, values: readonly unknown[], ...variables: RuntimeVariable[]): string => {
     let result = classes;
-    for (const [name, strings, values, property = `--${name}`] of variables) {
-      const value = text(strings, values, invalid);
+    for (const [name, strings, indexes, property = `--${name}`] of variables) {
+      const value = text(strings, indexes, values, invalid);
       if (value === null) continue;
       const className = `_${name}${hash(value, alphabet)}`;
       // The server returns the same class strings, without the rules, so
@@ -94,9 +95,9 @@ const invalidValue: InvalidValue = (value) => {
   throw new TypeError(`pre.style error 1 (${typeof value}): https://pre.style/errors/1`);
 };
 
-// What a block with `${…}` compiles to. It takes the block's class string and
-// its variables, and returns the class string with a generated class for each
-// value.
+// What a block with `${…}` compiles to. It takes the block's class string, its
+// expressions' values, so each runs once and in order, and its variables, and
+// returns the class string with a generated class for each value.
 export const dynamic = /* @__PURE__ */ create(CASE_SENSITIVE, invalidValue);
 
 // For the `quirksMode` setting, where class selectors ignore case.

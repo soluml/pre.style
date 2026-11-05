@@ -1,0 +1,6 @@
+---
+import { css } from '@pre.style/core';
+const { width } = Astro.props;
+export const card = css`width: ${width}px;`;
+---
+<div class={card}></div>

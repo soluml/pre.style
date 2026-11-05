@@ -3,8 +3,35 @@ import assert from 'node:assert/strict';
 
 // Server-side behavior is tested before a document exists, since the runtime
 // keeps one stylesheet for the page.
-const { dynamic, dynamicLowercase } = await import('../src/runtime.ts');
-const dev = await import('../src/runtime-dev.ts');
+const runtime = await import('../src/runtime.ts');
+const development = await import('../src/runtime-dev.ts');
+
+// Passes each variable's values inline, for readable tests.
+type Inline = [
+  name: string,
+  strings: readonly string[],
+  values: readonly unknown[],
+  property?: string,
+];
+const inline =
+  (run: typeof runtime.dynamic) =>
+  (classes: string, ...variables: Inline[]) => {
+    const all: unknown[] = [];
+    return run(
+      classes,
+      all,
+      ...variables.map(([name, strings, values, property]) => {
+        const indexes = values.map((value) => all.push(value) - 1);
+        return [name, strings, indexes, property] as [string, readonly string[], number[], string?];
+      }),
+    );
+  };
+const dynamic = inline(runtime.dynamic);
+const dynamicLowercase = inline(runtime.dynamicLowercase);
+const dev = {
+  dynamic: inline(development.dynamic),
+  dynamicLowercase: inline(development.dynamicLowercase),
+};
 
 const shape = /^_A[0-9A-Za-z]{4}$/;
 
@@ -94,6 +121,18 @@ describe('on the server', () => {
 
   test('one missing value means the variable has no value', () => {
     assert.equal(dynamic('A', ['A', ['', 'px ', 'px'], [1, null]]), 'A');
+  });
+
+  test('a value can be used by several variables, or none', () => {
+    const result = runtime.dynamic(
+      '',
+      ['x', 'unused', 'y'],
+      ['A', ['', ''], [0]],
+      ['B', ['', ''], [0]],
+      ['C', ['', ''], [2]],
+    );
+    assert.equal(result.split(' ').length, 3);
+    assert.equal(result.split(' ')[2], dynamic('', ['C', ['', ''], ['y']]));
   });
 
   test('zero and empty strings are values', () => {
