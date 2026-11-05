@@ -23,7 +23,14 @@ import type {
   ResolvedLibrary,
 } from '@pre.style/core/compiler';
 import type { EnvironmentModuleNode, Plugin, ResolvedConfig, Rollup, ViteDevServer } from 'vite';
-import { FindError, findInHtml, findInScript, locateIn, SHEET_IMPORT } from './find.ts';
+import {
+  FindError,
+  findInComponent,
+  findInHtml,
+  findInScript,
+  locateIn,
+  SHEET_IMPORT,
+} from './find.ts';
 import type { CnCall, FoundBlock, FoundImport, ScriptAnalysis, SheetClass } from './find.ts';
 
 export type { LibraryConfig, PackageConfig };
@@ -530,17 +537,26 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
           let found: FoundBlock[] = [];
           if (HTML.test(id)) found = htmlBlocks(code, id);
           else if (ASTRO.test(id)) {
-            // A block with `${…}` is in a client script, or an error when
-            // it's compiled. Text matching can't tell where it ends.
-            if (code.includes('@pre.style/core'))
-              found = findInHtml(code).filter((b) => !b.code.includes('${'));
+            if (code.includes('@pre.style/core')) found = findInComponent(code);
             specifiers = imported;
           } else {
             const analysis = findInScript(id, code);
             found = analysis?.blocks ?? [];
             specifiers = analysis?.sheets.map((sheet) => sheet.specifier) ?? [];
           }
-          for (const b of found) compiler.scan(block(b, id));
+          for (const b of found) {
+            // A block with `${…}` in a client script has to be found here:
+            // Astro ships the server build's CSS. In a frontmatter or template
+            // it's an error when it's compiled, and text matching can find code
+            // samples, so one that doesn't compile is left for then.
+            if (b.interpolation !== undefined && ASTRO.test(id))
+              try {
+                compiler.scan(block(b, id));
+              } catch (error) {
+                if (!(error instanceof PreStyleError)) throw error;
+              }
+            else compiler.scan(block(b, id));
+          }
         } catch (error) {
           fail(this, error, id);
         }

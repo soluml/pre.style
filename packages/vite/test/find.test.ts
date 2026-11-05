@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findInScript } from '../src/find.ts';
+import { findInComponent, findInScript } from '../src/find.ts';
 
 // Whether each `cn` call is resolved at build time, by the label in its
 // last argument.
@@ -170,5 +170,47 @@ describe('blocks with runtime values', () => {
 
   test('blocks without values have no interpolation', () => {
     assert.equal(find('css`color: red;`').blocks[0].interpolation, undefined);
+  });
+});
+
+describe('blocks in Astro components', () => {
+  test('without `${…}`', () => {
+    const [found] = findInComponent('<a class={css`color: red;`}></a>');
+    assert.equal(found.code, 'color: red;');
+    assert.equal(found.interpolation, undefined);
+  });
+
+  test('keep the text and expressions, with their positions', () => {
+    const source = '<script>\n  const a = css`width: ${w + 1}px; color: ${c};`;\n</script>';
+    const [found] = findInComponent(source);
+    assert.deepEqual(found.interpolation!.strings, ['width: ', 'px; color: ', ';']);
+    assert.deepEqual(
+      found.interpolation!.expressions.map((e) => e.code),
+      ['w + 1', 'c'],
+    );
+    assert.deepEqual([found.line, found.column], [2, 17]);
+    assert.equal(source.slice(found.start, found.end), 'css`width: ${w + 1}px; color: ${c};`');
+  });
+
+  test('nested templates, braces, strings, and comments', () => {
+    for (const expression of ['`${a}px`', 'f(`a`)', '{ a: 1 }.a', "'}`'", 'a /* } */']) {
+      const blocks = findInComponent(`css\`width: \${${expression}}; color: red;\`; scss\`b: c;\``);
+      assert.equal(blocks.length, 2, expression);
+      assert.equal(blocks[0].interpolation!.expressions[0].code, expression);
+      assert.equal(blocks[1].lang, 'scss');
+    }
+  });
+
+  test('an unclosed block is skipped', () => {
+    assert.deepEqual(findInComponent('css`width: ${a'), []);
+    assert.deepEqual(findInComponent('css`color: red;'), []);
+  });
+
+  test('match what the compiled module finds', () => {
+    const compiled = findInScript(
+      'test.ts',
+      "import { css } from '@pre.style/core';\ncss`width: ${w}px;`;",
+    )!.blocks[0];
+    assert.equal(findInComponent('css`width: ${w}px;`')[0].code, compiled.code);
   });
 });

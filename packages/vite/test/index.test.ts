@@ -827,6 +827,26 @@ describe('runtime values', () => {
     );
   });
 
+  test("a value's atom is in the scan, for an Astro client script", async () => {
+    const file = `${fixture('runtime-astro')}/src/Card.astro`;
+    const original = readFileSync(file, 'utf8');
+    const script =
+      'export const card = "a";\n---\n<script>\n  css`color: ${c}; margin-top: ${m}px;`;\n</script>\n';
+    writeFileSync(file, `---\nimport { css } from '@pre.style/core';\n${script}`);
+    try {
+      // Only the frontmatter is compiled here, as the fake compiler can't split
+      // scripts out, so the scan is what wrote this to the CSS.
+      const files = await buildFixture(
+        'runtime-astro',
+        {},
+        { plugins: [...config('runtime-astro', {}).plugins!, fakeAstro] },
+      );
+      assert.match(outputCss(files), /margin-top: var\(--\w+\)/);
+    } finally {
+      writeFileSync(file, original);
+    }
+  });
+
   test('`${…}` in HTML is an error', async () => {
     const file = `${fixture('runtime-html')}/index.html`;
     await assert.rejects(

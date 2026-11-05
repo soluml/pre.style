@@ -509,12 +509,103 @@ export function findInHtml(code: string): FoundBlock[] {
   return blocks;
 }
 
+const COMPONENT_TAG = /\b(s?css)`/g;
+
+// The offset after the `}` that ends an expression starting at `from`, skipping
+// strings, comments, and nested templates and braces. -1 if it doesn't end.
+function expressionEnd(code: string, from: number): number {
+  let depth = 0;
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      if (depth === 0) return i + 1;
+      depth--;
+    } else if (ch === '"' || ch === "'") {
+      for (i++; i < code.length && code[i] !== ch && code[i] !== '\n'; i++)
+        if (code[i] === '\\') i++;
+    } else if (ch === '`') {
+      const end = templateEnd(code, i + 1, []);
+      if (end === -1) return -1;
+      i = end;
+    } else if (ch === '/' && code[i + 1] === '/') {
+      const newline = code.indexOf('\n', i);
+      if (newline === -1) return -1;
+      i = newline;
+    } else if (ch === '/' && code[i + 1] === '*') {
+      const close = code.indexOf('*/', i + 2);
+      if (close === -1) return -1;
+      i = close + 1;
+    }
+  }
+  return -1;
+}
+
+// The closing backtick of a template starting at `from`, or -1. Each `${…}` is
+// added to `expressions`, without its `${` and `}`.
+function templateEnd(code: string, from: number, expressions: [number, number][]): number {
+  for (let i = from; i < code.length; i++) {
+    if (code[i] === '\\') i++;
+    else if (code[i] === '`') return i;
+    else if (code[i] === '$' && code[i + 1] === '{') {
+      const end = expressionEnd(code, i + 2);
+      if (end === -1) return -1;
+      expressions.push([i + 2, end - 1]);
+      i = end - 1;
+    }
+  }
+  return -1;
+}
+
+// Finds blocks in an Astro component by text matching, since it isn't a script
+// until Astro compiles it. Unlike HTML, its blocks can have `${…}`, in client
+// scripts, so their expressions are followed, including nested templates.
+export function findInComponent(code: string): FoundBlock[] {
+  const locate = locator(code);
+  const blocks: FoundBlock[] = [];
+  const tag = new RegExp(COMPONENT_TAG);
+  for (let match = tag.exec(code); match !== null; match = tag.exec(code)) {
+    const contentStart = match.index + match[0].length;
+    const ranges: [number, number][] = [];
+    const close = templateEnd(code, contentStart, ranges);
+    if (close === -1) continue;
+    const block: FoundBlock = {
+      start: match.index,
+      end: close + 1,
+      code: code.slice(contentStart, close),
+      lang: match[1] as Lang,
+      ...locate(contentStart),
+    };
+    if (ranges.length > 0) {
+      const strings: string[] = [];
+      let at = contentStart;
+      for (const [start, end] of ranges) {
+        strings.push(code.slice(at, start - 2));
+        at = end + 1;
+      }
+      strings.push(code.slice(at, close));
+      block.interpolation = {
+        strings,
+        expressions: ranges.map(([start, end]) => ({
+          start,
+          end,
+          code: code.slice(start, end),
+          ...locate(start),
+        })),
+      };
+    }
+    blocks.push(block);
+    tag.lastIndex = close + 1;
+  }
+  return blocks;
+}
+
 // Moves each block's line and column to where it's written in `source`, the
 // file a script was compiled from, such as an Astro component. Compilers
 // copy blocks unchanged, so each is matched to the next unused block in
 // `source` with the same code. Blocks it can't find keep their positions.
 export function locateIn(blocks: FoundBlock[], source: string): void {
-  const unused = findInHtml(source);
+  const unused = findInComponent(source);
   for (const found of blocks) {
     const index = unused.findIndex((b) => b.lang === found.lang && b.code === found.code);
     if (index === -1) continue;
