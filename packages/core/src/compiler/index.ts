@@ -1,6 +1,7 @@
-export { Compiler, createCompiler } from './compiler.ts';
+export { Compiler, createCompiler, interpolatedBlock } from './compiler.ts';
 export type {
   Block,
+  BlockVariable,
   ClassUsage,
   CompiledStylesheet,
   CompilerOptions,
@@ -11,6 +12,7 @@ export type {
 } from './compiler.ts';
 export { PreStyleError } from './block.ts';
 export type { Lang, LightningOptions, Position } from './block.ts';
+export type { Slot } from './interpolate.ts';
 export type { Printed } from './print.ts';
 export { checkField, readConfig } from './config.ts';
 export type { PackageConfig } from './config.ts';
