@@ -83,6 +83,71 @@ function assertOutside(tokens: Token[], text: string, nth = 0) {
   assert.ok(!has(scopes, 'meta.embedded.block.pre-style'), `"${text}" is in a block`);
 }
 
+describe('`${…}` in blocks', () => {
+  const inExpression = (tokens: Token[], text: string) => {
+    const scopes = scopesOf(tokens, text);
+    assert.ok(has(scopes, 'meta.embedded.expression.pre-style'), `"${text}": ${scopes.join(' ')}`);
+    assert.ok(has(scopes, 'source.js'), `"${text}": ${scopes.join(' ')}`);
+  };
+
+  for (const [language, scope] of [
+    ['css', 'source.ts'],
+    ['css', 'source.tsx'],
+    ['css', 'source.js'],
+    ['scss', 'source.ts'],
+  ]) {
+    test(`is JavaScript in a ${language} block in ${scope}`, async () => {
+      const tokens = await tokenize(
+        scope,
+        `const a = ${language}\`width: \${count}px; color: red;\`;\nconst b = 1;`,
+      );
+      inExpression(tokens, 'count');
+      assertCss(tokens, 'color', 'support.type.property-name');
+      assertOutside(tokens, 'b');
+    });
+  }
+
+  test('in a nested rule, an at-rule, and var()', async () => {
+    const tokens = await tokenize(
+      'source.ts',
+      `css\`
+  &::before { content: \${first}; }
+  @media (min-width: 1px) { width: \${second}px; }
+  margin: var(\${third}px, 120px);
+  color: red;
+\`;`,
+    );
+    inExpression(tokens, 'first');
+    inExpression(tokens, 'second');
+    inExpression(tokens, 'third');
+    assertCss(tokens, 'color', 'support.type.property-name');
+  });
+
+  test('its punctuation', async () => {
+    const tokens = await tokenize('source.ts', 'css`width: ${w}px;`;');
+    assert.ok(has(scopesOf(tokens, '${'), 'punctuation.definition.template-expression.begin'));
+    assert.ok(has(scopesOf(tokens, '}'), 'punctuation.definition.template-expression.end'));
+  });
+
+  test('braces in an expression do not end it', async () => {
+    const tokens = await tokenize('source.ts', 'css`width: ${{ inner: 1 }.inner}px; color: red;`;');
+    inExpression(tokens, 'inner');
+    assertCss(tokens, 'color', 'support.type.property-name');
+  });
+
+  test('a template in an expression does not end the block', async () => {
+    const tokens = await tokenize('source.ts', 'css`width: ${`${inner}px`}; color: red;`;\nb;');
+    assertCss(tokens, 'color', 'support.type.property-name');
+    assertOutside(tokens, 'b');
+  });
+
+  test('blocks without one are unchanged', async () => {
+    const tokens = await tokenize('source.ts', 'css`color: red;`;');
+    assertCss(tokens, 'color', 'support.type.property-name');
+    assertCss(tokens, 'red', 'support.constant.color');
+  });
+});
+
 describe('css blocks in TypeScript', () => {
   test('declarations, nesting, and at-rules', async () => {
     const tokens = await tokenize(
