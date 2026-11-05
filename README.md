@@ -367,6 +367,8 @@ cn(
 );
 ```
 
+A block whose value is `null` or `undefined` adds no class, so it doesn't clear an earlier block's value of the same variable.
+
 #### Where values can go
 
 `${…}` becomes a `var()`, so it can only go where `var()` works: in a declaration's value. These fail the build:
@@ -392,7 +394,7 @@ css`
 `;
 ```
 
-Values must be strings or numbers. To combine blocks, use `cn` rather than interpolating one into another.
+Values must be strings or numbers, or `null` or `undefined` to use the default. Anything else, including `false`, `NaN`, and objects, [throws an error](#runtime-errors) when the block runs, so write `${open ? width : null}` rather than `${open && width}`. To combine blocks, use `cn` rather than interpolating one into another.
 
 #### Server rendering
 
@@ -944,6 +946,14 @@ The build fails, with the file, line, and column, when:
 - a project has an `scss` block or file but Sass isn't installed;
 - a stylesheet file has invalid CSS, or fails to compile with Sass;
 - `composes` comes after other declarations, is used in a nested selector or at-rule, names a class or file that doesn't exist, or forms a cycle.
+
+### Runtime errors
+
+[Runtime values](#runtime-values) are checked in the browser and on the server. Outside production builds, errors have full messages. To keep the runtime small, production builds only have a number and the type of the value:
+
+| Error | Meaning |
+| --- | --- |
+| `pre.style error 1: <type>` | A `${…}` value wasn't a string or a finite number, or `null` or `undefined` to use the default. `number` means it was `NaN` or `Infinity`. For a condition, write `${open ? width : null}` rather than `${open && width}`. |
 
 ## Known limitations
 

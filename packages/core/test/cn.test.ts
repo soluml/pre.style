@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCn, cn } from '../src/index.ts';
 import { createCompiler } from '../src/compiler/index.ts';
+import { generatedClasses } from '../src/runtime.ts';
 
 const table = {
   '': { color: 'A B', 'margin-top': 'C', margin: 'D', 'background-color': 'G' },
@@ -103,5 +104,42 @@ describe('cn with a compiled table', () => {
     const m = createCn(compiler.cnTable());
     assert.equal(m(longhands, shorthand), `${longhands.split(' ')[2]} ${shorthand}`);
     assert.equal(m(shorthand, longhands), `${shorthand} ${longhands}`);
+  });
+});
+
+describe('generated classes', () => {
+  test('without them, classes shaped like them are kept', () => {
+    assert.equal(createCn({})('_A1111', '_A2222'), '_A1111 _A2222');
+  });
+
+  const generated = createCn(
+    { '': { width: 'A B', '--brand': 'C' } },
+    generatedClasses({ A: '', b: '--brand' }),
+  );
+
+  test('a later value of a variable wins', () => {
+    assert.equal(generated('A _A1111', 'A _A2222'), 'A _A2222');
+  });
+  test('values of different variables are kept', () => {
+    assert.equal(generated('_A1111', '_b2222'), '_A1111 _b2222');
+  });
+  test('a named custom property conflicts with its own atoms', () => {
+    assert.equal(generated('C', '_b2222'), '_b2222');
+    assert.equal(generated('_b2222', 'C'), 'C');
+  });
+  test('classes that only look generated are kept', () => {
+    assert.equal(generated('_Z1111', '_Z2222', '_alert', '_A'), '_Z1111 _Z2222 _alert _A');
+  });
+  test("a plain class isn't mistaken for a generated one", () => {
+    assert.equal(generated('alert', '_A1111'), 'alert _A1111');
+  });
+  test("names on Object.prototype aren't variables", () => {
+    assert.equal(
+      generated('_constructor1111', '_constructor2222'),
+      '_constructor1111 _constructor2222',
+    );
+  });
+  test('a different default drops the earlier atom but keeps the variable', () => {
+    assert.equal(generated('A _A1111', 'B'), '_A1111 B');
   });
 });

@@ -23,4 +23,4 @@ import { createCn } from './cn.ts';
 // are rewritten.
 export const cn = /* @__PURE__ */ createCn({});
 export { createCn };
-export type { ClassDictionary, ClassValue, CnTable } from './cn.ts';
+export type { ClassDictionary, ClassValue, CnLookup, CnTable } from './cn.ts';

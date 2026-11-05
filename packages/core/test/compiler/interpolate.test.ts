@@ -497,6 +497,25 @@ describe('positions', () => {
   });
 });
 
+describe('`cn`', () => {
+  test('lists variables, with named custom properties', async () => {
+    const compiler = await createCompiler();
+    const b = interpolatedBlock(block`width: ${'a'}px; --brand: ${'b'};`);
+    compiler.scan(b);
+    compiler.assignNames();
+    const variables = compiler.cnVariables();
+    assert.deepEqual(Object.values(variables).toSorted(), ['', '--brand']);
+    assert.ok(variables[compiler.variables(b)[0].name] === '');
+  });
+
+  test('a new variable changes the revision, even with no new CSS', async () => {
+    const compiler = await createCompiler();
+    const { revision } = compiler;
+    compiler.classString(interpolatedBlock(block`--brand: ${'c'};`));
+    assert.notEqual(compiler.revision, revision);
+  });
+});
+
 describe('source maps', () => {
   test('a block with values maps to its file', async () => {
     const compiler = await createCompiler({ sourceMap: true });

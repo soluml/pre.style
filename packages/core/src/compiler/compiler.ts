@@ -26,6 +26,7 @@ import { VARIABLE_PREFIX } from './variables.ts';
 import { MARKER_PREFIX, markerKey, parseStylesheet } from './stylesheet.ts';
 import type { ParsedStylesheet } from './stylesheet.ts';
 import type { CnTable } from '../cn.ts';
+import type { CnVariables } from '../runtime.ts';
 import { SHORTHANDS } from '../shorthands.ts';
 
 // Files prepended to blocks: an array for every block, or separate arrays
@@ -244,6 +245,8 @@ export class Compiler {
   readonly #globals = new Map<string, GlobalRecord>();
   // The current global for each overridable at-rule.
   readonly #overrides = new Map<string, string>();
+  // Each runtime variable's custom property, or null for `--<its name>`.
+  readonly #variables = new Map<string, string | null>();
   #order = 0;
 
   constructor(options: CompilerOptions, sass: SassCompiler | null) {
@@ -460,6 +463,14 @@ export class Compiler {
     return table;
   }
 
+  // The variables runtime values set, for `cn` to recognize generated classes.
+  cnVariables(): CnVariables {
+    const variables: CnVariables = {};
+    for (const [key, property] of this.#variables)
+      variables[this.#names.variables.set(key)] = property ?? '';
+    return variables;
+  }
+
   // A library's blocks and files get its prepended files and keyframes
   // setting instead of the app's.
   #library(file: string | undefined): { library: number; options: ParseOptions } {
@@ -671,6 +682,12 @@ export class Compiler {
   }
 
   #register(block: Block, parsed: ParsedBlock) {
+    for (const variable of parsed.variables ?? []) {
+      if (this.#variables.has(variable.key)) continue;
+      this.#variables.set(variable.key, variable.property);
+      // A custom property set directly adds no atom or rule, but `cn` needs it.
+      this.#order++;
+    }
     for (const atom of parsed.atoms) {
       const key = atomKey(atom);
       const source = sourceOf(block, atom.position);
