@@ -50,7 +50,7 @@ After the build, `button` is a plain string, `"B C E D A G F"`. The block is rep
 }
 ```
 
-- **No runtime.** Blocks are replaced with class strings during the build. Nothing is shipped to parse or inject CSS.
+- **No runtime by default.** Blocks are replaced with class strings during the build, and nothing is shipped to parse or inject CSS. The exception is [runtime values](#runtime-values), which you opt in to by writing `${…}`.
 - **Small CSS.** Each declaration is written once, however many components use it, so the CSS file grows slowly as your project grows.
 - **Just CSS.** Blocks are standard CSS (with nesting) or SCSS. There's no new syntax to learn.
 - **Fast.** Built on [Lightning CSS](https://lightningcss.dev/). Every block is parsed once, in one process.
@@ -161,7 +161,256 @@ const title = scss`
 `;
 ```
 
-Blocks can't contain `${…}` interpolation. pre.style needs to know every block's CSS at build time. Share values with [prepended files](#sharing-values-with-prepended-files) instead.
+### Runtime values
+
+Use `${…}` for values that are only known while your app runs, such as props:
+
+```jsx
+function Bar({ width }) {
+  const bar = css`
+    width: ${width}px;
+  `;
+  return <div className={bar} />;
+}
+```
+
+Each `${…}` becomes a custom property, and the block's CSS is still written to the CSS file during the build:
+
+```css
+@property --A {
+  syntax: "*";
+  inherits: false;
+}
+
+.A {
+  width: var(--A);
+}
+```
+
+In the browser, a small runtime generates one class for each distinct value and inserts its rule once. `bar` is still a plain string, `"A _A3fK9"`, so it works anywhere a class string does, including `cn`.
+
+```css
+._A3fK9 {
+  --A: 240px;
+}
+```
+
+> [!IMPORTANT]
+> **`${…}` adds JavaScript to your bundle.** It's the one part of pre.style with a runtime, and only apps that use `${…}` load it. Everything else stays static, so use `${…}` only for values that change at runtime. For constants, such as design tokens, use [Sass or prepended files](#sharing-values-with-prepended-files), which cost nothing in the browser. `${tokens.red}` uses the runtime, even though its value never changes.
+
+The generated `@property` keeps the variable from inheriting. Variables are shared by every block with the same declaration, so without it, an element with no value of its own would take its parent's.
+
+#### Default values
+
+Write `var()` around a value to give it a default:
+
+```js
+css`
+  width: var(${width}px, 120px);
+  color: var(${color}, currentColor);
+  background-color: var(${color}, var(--surface));
+`;
+```
+
+```css
+.A {
+  width: var(--A, 120px);
+}
+```
+
+The default can be any CSS. It's used when the value is `null` or `undefined`, in which case no class is generated, and until the runtime sets the value in the browser (see [Server rendering](#server-rendering)). A value of the wrong type doesn't use it: `width: var(${"red"}, 120px)` resets `width`. To catch those, use [`type()`](#typed-values-with-type).
+
+#### Several values
+
+Each `${…}` and the text touching it is one value, with its own variable:
+
+```js
+css`
+  color: #${hex};
+  margin-top: calc(${gap}px * 2);
+  background-image: linear-gradient(${from}, ${to});
+`;
+```
+
+Values inside one `var()` share a variable, and so share a default:
+
+```js
+css`
+  margin: var(${y}px ${x}px, auto);
+`;
+```
+
+```css
+.A {
+  margin: var(--A, auto);
+}
+```
+
+#### Custom properties
+
+A custom property set directly on the element is set by name. It needs no generated variable or `@property`, only the generated class:
+
+```js
+const badge = css`
+  --brand: ${color};
+  color: var(--brand);
+`;
+```
+
+```css
+.A {
+  color: var(--brand);
+}
+
+/* Inserted by the runtime */
+._B7xQ2 {
+  --brand: #00f;
+}
+```
+
+To give it a default, write `var()` around the value, or register it with `@property`, whose `initial-value` is the default. Write the rule yourself for full control, such as `inherits: true`:
+
+```js
+css`
+  @property --brand {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: #f00;
+  }
+
+  --brand: ${color};
+  color: var(--brand);
+`;
+```
+
+With `inherits: true`, an element with no value of its own takes its parent's rather than the `initial-value`.
+
+#### Typed values with `type()`
+
+Add `type()` to say what kind of value a variable holds, the same way as in [`attr()`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/attr). It takes any [`@property` syntax](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@property/syntax):
+
+```js
+css`
+  width: var(${width}px type(<length>), 120px);
+  height: var(${height} type(<length> | auto), auto);
+  border-color: var(${color} type(<color>), red);
+  translate: var(${x}px ${y}px type(<length>+), 0px);
+`;
+```
+
+The default moves to the variable's `initial-value`, and the variable gets the type:
+
+```css
+@property --A {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 120px;
+}
+
+.A {
+  width: var(--A);
+}
+```
+
+On a custom property set directly on the element, it registers that property, so you don't have to write the `@property` yourself:
+
+```js
+css`
+  --brand: var(${color} type(<color>), #f00);
+  color: var(--brand);
+  transition: --brand 200ms;
+`;
+```
+
+```css
+@property --brand {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: red;
+}
+```
+
+Typed values are larger, and each type and default gets its own variable, so they're opt-in. In return:
+
+- A value of the wrong type uses the default, instead of resetting the property.
+- The variable can be transitioned and animated, as in the example above.
+- The default is checked against the type during the build.
+
+A typed value must have a default, which can't use `${…}`, `var()`, or anything that depends on where it's used, such as `em`, `rem`, container units, `env()`, or `attr()`: browsers ignore the whole `@property` rule otherwise, so the build fails. Browsers without `@property` (before July 2024) have no default for a typed value until the runtime sets it.
+
+#### Animations
+
+`@keyframes`, `@position-try`, and `@function` read variables from the element using them, so they can hold values too:
+
+```js
+const bar = css`
+  @keyframes grow {
+    to {
+      width: var(${width}px, 200px);
+    }
+  }
+
+  animation: grow 1s forwards;
+`;
+```
+
+The generated class has to be on the element that runs the animation, since variables don't inherit.
+
+#### Using `cn`
+
+Blocks with values work with `cn`, and the later value wins. A `cn` call with one runs in the browser, so it includes the lookup table:
+
+```js
+cn(
+  css`width: ${small}px;`,
+  css`width: ${large}px;`,
+);
+```
+
+#### Where values can go
+
+`${…}` becomes a `var()`, so it can only go where `var()` works: in a declaration's value. These fail the build:
+
+```js
+css`
+  .${name} { color: red; }                 /* selectors */
+  margin-${side}: 0;                       /* property names */
+  @media (min-width: ${bp}px) { top: 0; }  /* at-rule conditions, see Sharing media queries */
+  @font-face { font-weight: ${weight}; }   /* @font-face, @property, @page, and similar */
+  content: "${label}";                     /* quoted strings */
+  background-image: url(${path});          /* url() */
+`;
+```
+
+For strings and URLs, pass the whole value:
+
+```js
+css`
+  content: ${JSON.stringify(label)};
+  --image: ${`url("${path}")`};
+  background-image: var(--image);
+`;
+```
+
+Values must be strings or numbers. To combine blocks, use `cn` rather than interpolating one into another.
+
+#### Server rendering
+
+The server renders the same class strings as the browser, so hydration matches, but it doesn't write the generated rules. The page uses the defaults until the runtime sets the values in the browser, so pick a default close to the usual value to avoid a visible jump. Without a default, the declaration has no effect until then.
+
+Values need code that runs in the browser. `${…}` fails the build in HTML, and in the frontmatter and templates of Astro components, where it could never be set (Astro client scripts are fine). React Server Components have the same problem, but the build can't detect it there: use client components for blocks with values.
+
+#### When to use `style` instead
+
+Every new value adds a rule that's never removed. That suits values with a limited set of results, such as a theme color or a chosen size. For values that change constantly, such as a drag position or anything set per frame, use the `style` attribute and read it from the block:
+
+```jsx
+const box = css`
+  transform: translateX(var(--x));
+`;
+
+<div className={box} style={{ "--x": `${x}px` }} />;
+```
 
 ### Selectors
 
@@ -689,7 +938,8 @@ The build fails, with the file, line, and column, when:
 
 - a block has invalid CSS syntax;
 - Sass fails to compile an `scss` block;
-- a block contains `${…}` interpolation;
+- a block has `${…}` anywhere but a declaration's value, or in HTML or an Astro component's frontmatter or template (see [Where values can go](#where-values-can-go) and [Server rendering](#server-rendering));
+- a `type()` has no default, or its default is invalid for the type or depends on where it's used;
 - `css` or `scss` is used other than as a tagged template;
 - a project has an `scss` block or file but Sass isn't installed;
 - a stylesheet file has invalid CSS, or fails to compile with Sass;
