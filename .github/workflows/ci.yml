@@ -23,3 +23,5 @@ jobs:
       - run: npm run demo:react-router:build
       - run: npm run demo:tanstack-start:build
       - run: npm run demo:astro:build
+      # After the builds: demos are checked against the packages' built types.
+      - run: npm run demo:typecheck

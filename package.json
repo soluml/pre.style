@@ -17,6 +17,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "demo:typecheck": "npm run typecheck -w demo/react/ui -w demo/react/react-router -w demo/react/tanstack-start -w demo/astro",
     "demo:react-router": "npm run dev -w demo/react/react-router",
     "demo:react-router:build": "npm run build -w demo/react/react-router",
     "demo:react-router:start": "npm run start -w demo/react/react-router",
