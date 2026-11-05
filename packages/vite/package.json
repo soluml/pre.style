@@ -1,6 +1,6 @@
 {
   "name": "@pre.style/vite",
-  "version": "3.1.0-alpha.5",
+  "version": "3.1.0-alpha.6",
   "description": "Vite plugin for pre.style.",
   "keywords": [
     "atomic-css",
@@ -48,7 +48,7 @@
     "test": "node --conditions=pre.style-source --test \"test/**/*.test.ts\""
   },
   "dependencies": {
-    "@pre.style/core": "3.1.0-alpha.2",
+    "@pre.style/core": "3.1.0-alpha.3",
     "magic-string": "^1.4.3",
     "oxc-parser": "^0.155.0"
   },

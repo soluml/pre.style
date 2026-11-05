@@ -13,12 +13,12 @@
     "typecheck": "tsc"
   },
   "devDependencies": {
-    "@pre.style/core": "3.1.0-alpha.2",
+    "@pre.style/core": "3.1.0-alpha.3",
     "@types/react": "^19.3.0",
     "react": "^19.3.1"
   },
   "peerDependencies": {
-    "@pre.style/core": "3.1.0-alpha.2",
+    "@pre.style/core": "3.1.0-alpha.3",
     "react": "^19.3.1"
   },
   "pre.style": {

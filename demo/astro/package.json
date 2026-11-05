@@ -12,14 +12,14 @@
   "dependencies": {
     "@astrojs/node": "^11.1.9",
     "@astrojs/react": "^7.1.1",
-    "@pre.style/core": "3.1.0-alpha.2",
+    "@pre.style/core": "3.1.0-alpha.3",
     "astro": "^7.4.2",
     "pre.style-demo-react-ui": "0.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@pre.style/vite": "3.1.0-alpha.5",
+    "@pre.style/vite": "3.1.0-alpha.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "lightningcss": "^1.33.0",
