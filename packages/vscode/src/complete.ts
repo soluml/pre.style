@@ -41,6 +41,8 @@ export function completeInBlock(
 ): BlockCompletions | undefined {
   const block = findBlockAt(text, offset, html);
   if (!block) return undefined;
+  // Inside `${…}` is JavaScript, which VS Code's own language service handles.
+  if (block.expressions.some(([start, end]) => offset > start && offset < end)) return undefined;
   const doc = TextDocument.create(
     'pre-style://block',
     block.language,

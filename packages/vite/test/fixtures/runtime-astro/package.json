@@ -1,0 +1,5 @@
+{
+  "name": "fixture-runtime-astro",
+  "private": true,
+  "type": "module"
+}

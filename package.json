@@ -7,7 +7,8 @@
     "packages/vscode",
     "packages/devtools",
     "demo/react/*",
-    "demo/astro"
+    "demo/astro",
+    "demo/e2e"
   ],
   "type": "module",
   "scripts": {
@@ -17,6 +18,8 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "demo:e2e": "npm test -w demo/e2e",
+    "demo:typecheck": "npm run typecheck -w demo/react/ui -w demo/react/react-router -w demo/react/tanstack-start -w demo/astro -w demo/e2e",
     "demo:react-router": "npm run dev -w demo/react/react-router",
     "demo:react-router:build": "npm run build -w demo/react/react-router",
     "demo:react-router:start": "npm run start -w demo/react/react-router",

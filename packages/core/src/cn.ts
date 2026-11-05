@@ -8,7 +8,7 @@ import { SHORTHANDS } from './shorthands.ts';
 export type CnTable = Record<string, Record<string, string>>;
 
 // Each class's prefix and property.
-type Lookup = Map<string, readonly [prefix: string, property: string]>;
+export type CnLookup = Map<string, readonly [prefix: string, property: string]>;
 
 export type ClassValue =
   | string
@@ -37,7 +37,7 @@ function collect(value: ClassValue, classes: string[]) {
 // when they have the same prefix and set the same property. A later
 // shorthand also removes earlier longhands it covers. Classes not in the
 // table are kept.
-function resolve(classes: string[], lookup: Lookup): string[] {
+function resolve(classes: string[], lookup: CnLookup): string[] {
   const seen = new Set<string>();
   const kept: string[] = [];
   for (let i = classes.length - 1; i >= 0; i--) {
@@ -58,8 +58,12 @@ function resolve(classes: string[], lookup: Lookup): string[] {
   return kept.toReversed();
 }
 
-export function createCn(table: CnTable): (...inputs: ClassValue[]) => string {
-  const lookup: Lookup = new Map();
+export function createCn(
+  table: CnTable,
+  // Filled from the table. `generatedClasses` passes one that also knows
+  // classes generated at runtime.
+  lookup: CnLookup = new Map(),
+): (...inputs: ClassValue[]) => string {
   for (const [prefix, properties] of Object.entries(table))
     for (const [property, classes] of Object.entries(properties))
       for (const c of classes.split(' ')) lookup.set(c, [prefix, property]);

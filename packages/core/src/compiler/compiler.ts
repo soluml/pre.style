@@ -16,13 +16,17 @@ import type {
   Position,
   SassCompiler,
 } from './block.ts';
+import { interpolate } from './interpolate.ts';
+import type { Slot } from './interpolate.ts';
 import { print } from './print.ts';
 import type { Printed } from './print.ts';
 import { lvhfaRank, specificity, withClass } from './selectors.ts';
 import { KEYFRAMES_PREFIX } from './keyframes.ts';
+import { VARIABLE_PREFIX } from './variables.ts';
 import { MARKER_PREFIX, markerKey, parseStylesheet } from './stylesheet.ts';
 import type { ParsedStylesheet } from './stylesheet.ts';
 import type { CnTable } from '../cn.ts';
+import type { CnVariables } from '../runtime.ts';
 import { SHORTHANDS } from '../shorthands.ts';
 
 // Files prepended to blocks: an array for every block, or separate arrays
@@ -37,6 +41,8 @@ export interface Library {
   prependFiles?: PrependFiles;
   // Localize the library's keyframes, instead of the app's setting.
   keyframeLocalization?: boolean;
+  // Localize the library's custom properties, instead of the app's setting.
+  customPropertyLocalization?: boolean;
 }
 
 export interface CompilerOptions {
@@ -57,6 +63,9 @@ export interface CompilerOptions {
   // Give each `@keyframes` in the app's blocks and stylesheet files a
   // generated name, used only in its own block or file.
   keyframeLocalization?: boolean;
+  // Give each custom property declared in the app's blocks and stylesheet files
+  // a generated name, used only in that block or file.
+  customPropertyLocalization?: boolean;
   // Wrap the output in a cascade layer: `false` for none, `''` for an
   // unnamed layer, or the layer's name.
   layer?: false | string;
@@ -70,6 +79,21 @@ export interface Block {
   file?: string;
   line?: number;
   column?: number;
+  // What each `${…}` holds, for a block from `interpolatedBlock`.
+  slots?: Slot[];
+}
+
+// A variable a block sets at runtime.
+export interface BlockVariable {
+  // Its short name, which starts the classes generated for its values.
+  name: string;
+  // The custom property it sets.
+  property: string;
+  // The text and expressions that make up its value.
+  slot: Slot;
+  // Where to set it, split where the generated class goes, when the
+  // declaration reading it isn't on the element. Null when it is.
+  selector: string[] | null;
 }
 
 // A stylesheet file, imported with `with { type: 'pre.style' }`. Each class
@@ -168,6 +192,18 @@ const QUIRKS_NAME_OPTIONS = {
   ranges: Object.fromEntries(Object.entries(RANGES).filter(([name]) => name !== 'Uppercase')),
 };
 
+// A block with `${…}`, from the text around its expressions and their source.
+export function interpolatedBlock(
+  block: Omit<Block, 'code' | 'slots'> & { strings: string[]; expressions: string[] },
+): Block {
+  const { strings, expressions, ...rest } = block;
+  try {
+    return { ...rest, ...interpolate(strings, expressions, block.lang) };
+  } catch (error) {
+    throw error instanceof PreStyleError ? locate(error, { ...rest, code: '' }) : error;
+  }
+}
+
 export async function createCompiler(options: CompilerOptions = {}): Promise<Compiler> {
   let sass: SassCompiler | null = null;
   try {
@@ -179,7 +215,10 @@ export async function createCompiler(options: CompilerOptions = {}): Promise<Com
 }
 
 export class Compiler {
-  readonly #parseOptions: Omit<ParseOptions, 'prepend' | 'keyframeLocalization'>;
+  readonly #parseOptions: Omit<
+    ParseOptions,
+    'prepend' | 'keyframeLocalization' | 'customPropertyLocalization'
+  >;
   readonly #options: CompilerOptions;
   // Prepended code for the app's blocks, and for each library's, with the
   // most deeply nested library first.
@@ -188,6 +227,7 @@ export class Compiler {
     dir: string;
     prepend: Record<Lang, string>;
     keyframeLocalization: boolean;
+    customPropertyLocalization: boolean;
   }[];
   // The layer the output is wrapped in, as parsed, or null for none.
   readonly #layer: Rule | null;
@@ -197,20 +237,28 @@ export class Compiler {
 
   // One name list for every class, one for prefixes (the at-rules and
   // selector variant a class is under), which only the `cn` table uses, and
-  // one for localized keyframes.
-  readonly #names: { atoms: SweatMap; prefixes: SweatMap; keyframes: SweatMap };
-  // How often each class, prefix, and localized keyframes is used across
-  // scanned blocks.
+  // one each for localized keyframes and runtime variables.
+  readonly #names: {
+    atoms: SweatMap;
+    prefixes: SweatMap;
+    keyframes: SweatMap;
+    variables: SweatMap;
+  };
+  // How often each class, prefix, localized keyframes, and variable is used
+  // across scanned blocks.
   readonly #counts = {
     atoms: new Map<string, number>(),
     prefixes: new Map<string, number>(),
     keyframes: new Map<string, number>(),
+    variables: new Map<string, number>(),
   };
 
   readonly #atoms = new Map<string, AtomRecord>();
   readonly #globals = new Map<string, GlobalRecord>();
   // The current global for each overridable at-rule.
   readonly #overrides = new Map<string, string>();
+  // Each runtime variable's custom property, or null for `--<its name>`.
+  readonly #variables = new Map<string, string | null>();
   #order = 0;
 
   constructor(options: CompilerOptions, sass: SassCompiler | null) {
@@ -222,6 +270,8 @@ export class Compiler {
       // four characters only after about 227,000 names, so they're never
       // `none` or a CSS-wide keyword.
       keyframes: new SweatMap(NAME_OPTIONS),
+      // Part of the classes generated at runtime, so these follow class names.
+      variables: new SweatMap(options.quirksMode ? QUIRKS_NAME_OPTIONS : NAME_OPTIONS),
     };
     this.#layer = layerRule(options.layer);
     const root = options.root ?? process.cwd();
@@ -234,6 +284,7 @@ export class Compiler {
           dir: dir + sep,
           prepend: readPrepend(dir, library.prependFiles),
           keyframeLocalization: library.keyframeLocalization ?? false,
+          customPropertyLocalization: library.customPropertyLocalization ?? false,
         };
       })
       .toSorted((a, b) => b.dir.length - a.dir.length);
@@ -256,7 +307,8 @@ export class Compiler {
     const parsed = this.#parse(block);
     this.#register(block, parsed);
     this.#count(this.#resolveBlock(block, parsed, []));
-    for (const global of parsed.globals) this.#countKeyframes(global.key);
+    for (const global of parsed.globals) this.#countNames(global.key);
+    for (const variable of parsed.variables ?? []) count(this.#counts.variables, variable.key);
   }
 
   // Pass 1 of naming for a stylesheet file: counts what each class uses.
@@ -264,13 +316,13 @@ export class Compiler {
     const parsed = this.#parseSheet(sheet);
     for (const name of parsed.classes.keys())
       this.#count(this.#resolveClass(sheet.file, parsed, name, [], []));
-    for (const global of parsed.globals) this.#countKeyframes(global.key);
+    for (const global of parsed.globals) this.#countNames(global.key);
   }
 
   // Pass 2 of naming: gives the most-used entries the shortest names. Ties
   // are broken by key, so names don't depend on the order files are read.
   assignNames(): void {
-    for (const list of ['atoms', 'prefixes', 'keyframes'] as const) {
+    for (const list of ['atoms', 'prefixes', 'keyframes', 'variables'] as const) {
       const sorted = [...this.#counts[list]].toSorted(
         ([a, countA], [b, countB]) => countB - countA || (a < b ? -1 : a > b ? 1 : 0),
       );
@@ -284,6 +336,21 @@ export class Compiler {
     const parsed = this.#parse(block);
     this.#register(block, parsed);
     return this.#classString(this.#resolveBlock(block, parsed, []));
+  }
+
+  // The variables a block sets at runtime, in the order they're written.
+  variables(block: Block): BlockVariable[] {
+    const parsed = this.#parse(block);
+    this.#register(block, parsed);
+    return (parsed.variables ?? []).map((variable) => {
+      const name = this.#names.variables.set(variable.key);
+      return {
+        name,
+        property: variable.property ? this.#propertyName(variable.property) : `--${name}`,
+        slot: block.slots![variable.slot],
+        selector: variable.selector,
+      };
+    });
   }
 
   // The files a block's class string depends on, through `composes … from`.
@@ -403,11 +470,19 @@ export class Compiler {
       const key = prefixKey(record.atom);
       const prefix = key === '' ? '' : this.#names.prefixes.set(key);
       const properties = (table[prefix] ??= {});
-      const { property } = record.atom;
+      const property = this.#propertyName(record.atom.property);
       const name = this.#nameOf(record);
       properties[property] = properties[property] ? `${properties[property]} ${name}` : name;
     }
     return table;
+  }
+
+  // The variables runtime values set, for `cn` to recognize generated classes.
+  cnVariables(): CnVariables {
+    const variables: CnVariables = {};
+    for (const [key, property] of this.#variables)
+      variables[this.#names.variables.set(key)] = property ? this.#propertyName(property) : '';
+    return variables;
   }
 
   // A library's blocks and files get its prepended files and keyframes
@@ -415,9 +490,13 @@ export class Compiler {
   #library(file: string | undefined): { library: number; options: ParseOptions } {
     const library =
       file === undefined ? -1 : this.#libraries.findIndex(({ dir }) => file.startsWith(dir));
-    const { prepend, keyframeLocalization } =
+    const { prepend, keyframeLocalization, customPropertyLocalization } =
       library === -1
-        ? { prepend: this.#prepend, keyframeLocalization: this.#options.keyframeLocalization }
+        ? {
+            prepend: this.#prepend,
+            keyframeLocalization: this.#options.keyframeLocalization,
+            customPropertyLocalization: this.#options.customPropertyLocalization,
+          }
         : this.#libraries[library];
     return {
       library,
@@ -425,6 +504,7 @@ export class Compiler {
         ...this.#parseOptions,
         prepend,
         keyframeLocalization: keyframeLocalization ?? false,
+        customPropertyLocalization: customPropertyLocalization ?? false,
       },
     };
   }
@@ -574,7 +654,7 @@ export class Compiler {
       count(this.#counts.atoms, atomKey(atom));
       const prefix = prefixKey(atom);
       if (prefix !== '') count(this.#counts.prefixes, prefix);
-      this.#countKeyframes(atom.declaration.key);
+      this.#countNames(atom.declaration.key);
     }
     for (const extra of resolved.extras)
       if (extra.startsWith(MARKER_PREFIX)) count(this.#counts.atoms, extra);
@@ -587,11 +667,18 @@ export class Compiler {
     return [...new Set(names)].join(' ');
   }
 
-  // Counts the localized keyframes a JSON key names.
-  #countKeyframes(json: string) {
-    if (!json.includes(KEYFRAMES_KEY)) return;
-    for (const [, hash] of json.matchAll(KEYFRAMES_KEY_RE))
-      count(this.#counts.keyframes, KEYFRAMES_PREFIX + hash);
+  // Counts the localized keyframes and custom properties a JSON key names.
+  #countNames(json: string) {
+    if (json.includes(KEYFRAMES_KEY))
+      for (const [, hash] of json.matchAll(KEYFRAMES_KEY_RE))
+        count(this.#counts.keyframes, KEYFRAMES_PREFIX + hash);
+    if (json.includes(VARIABLE_KEY))
+      for (const [, hash] of json.matchAll(VARIABLE_KEY_RE)) count(this.#counts.variables, hash);
+  }
+
+  // A property's name in the output, for a custom property with a generated one.
+  #propertyName(property: string): string {
+    return property.startsWith(VARIABLE_PREFIX) ? (this.#named(property) as string) : property;
   }
 
   // Replaces markers in selectors, and localized keyframes names, with their
@@ -599,6 +686,8 @@ export class Compiler {
   #named<T>(value: T): T {
     const visit = (node: unknown): unknown => {
       if (Array.isArray(node)) return node.map(visit);
+      if (typeof node === 'string' && node.startsWith(VARIABLE_PREFIX))
+        return `--${this.#names.variables.set(node.slice(VARIABLE_PREFIX.length))}`;
       if (node === null || typeof node !== 'object') return node;
       const record = node as Record<string, unknown>;
       if (
@@ -619,6 +708,12 @@ export class Compiler {
   }
 
   #register(block: Block, parsed: ParsedBlock) {
+    for (const variable of parsed.variables ?? []) {
+      if (this.#variables.has(variable.key)) continue;
+      this.#variables.set(variable.key, variable.property);
+      // A custom property set directly adds no atom or rule, but `cn` needs it.
+      this.#order++;
+    }
     for (const atom of parsed.atoms) {
       const key = atomKey(atom);
       const source = sourceOf(block, atom.position);
@@ -686,7 +781,7 @@ export class Compiler {
 
   #atomRule(record: AtomRecord, loc: unknown): Rule {
     const { atom } = record;
-    const value = atom.declaration.key.includes(KEYFRAMES_KEY)
+    const value = hasGenerated(atom.declaration.key)
       ? this.#named(atom.declaration.value)
       : atom.declaration.value;
     const declarations = atom.declaration.important
@@ -706,9 +801,11 @@ export class Compiler {
         return this.#atomRule(record, loc(source));
       });
       for (const child of sortGroups([...group.children.values()])) {
+        const segment = child.segment!;
+        const named = hasGenerated(segment.key) ? this.#named(segment.rule) : segment.rule;
         rules.push({
-          type: child.segment!.rule.type,
-          value: { ...valueOf(child.segment!.rule), rules: emit(child) },
+          type: segment.rule.type,
+          value: { ...valueOf(named), rules: emit(child) },
         } as Rule);
       }
       return rules;
@@ -730,7 +827,8 @@ export class Compiler {
       className: record.className!,
       selector: code.slice(0, open).replaceAll('\n', ' '),
       atRules: atom.atRules.map((segment) => {
-        const wrapped = { ...valueOf(segment.rule), rules: [rule] };
+        const named = hasGenerated(segment.key) ? this.#named(segment.rule) : segment.rule;
+        const wrapped = { ...valueOf(named), rules: [rule] };
         const printed = text({ type: segment.rule.type, value: wrapped } as Rule);
         return printed.slice(0, printed.indexOf(' {\n'));
       }),
@@ -738,7 +836,7 @@ export class Compiler {
         .slice(open + 3, code.lastIndexOf('\n}'))
         .trim()
         .replace(/;$/, ''),
-      property: atom.property,
+      property: this.#propertyName(atom.property),
       covers: Object.hasOwn(SHORTHANDS, atom.property) ? SHORTHANDS[atom.property] : [],
       important: atom.declaration.important,
       specificity: specificity(this.#atomSelectors(record)),
@@ -759,12 +857,17 @@ interface Group {
 // escape the `\0`.
 const MARKER_KEY = JSON.stringify(MARKER_PREFIX).slice(1, -1);
 const KEYFRAMES_KEY = JSON.stringify(KEYFRAMES_PREFIX).slice(1, -1);
+const VARIABLE_KEY = JSON.stringify(VARIABLE_PREFIX).slice(1, -1);
+const VARIABLE_KEY_RE = new RegExp(`${RegExp.escape(VARIABLE_KEY)}([\\w-]+)`, 'g');
 const KEYFRAMES_KEY_RE = new RegExp(`${RegExp.escape(KEYFRAMES_KEY)}([\\w-]+)`, 'g');
 
 // Rules that can't be inside a layer.
 const outside = (rule: Rule) => rule.type === 'import' || rule.type === 'namespace';
 
-const hasPlaceholder = (json: string) => json.includes(MARKER_KEY) || json.includes(KEYFRAMES_KEY);
+// Whether a declaration has generated names.
+const hasGenerated = (json: string) => json.includes(KEYFRAMES_KEY) || json.includes(VARIABLE_KEY);
+
+const hasPlaceholder = (json: string) => json.includes(MARKER_KEY) || hasGenerated(json);
 
 // Parses the `layer` option into an `@layer` block rule.
 function layerRule(layer: false | string | undefined): Rule | null {

@@ -47,11 +47,60 @@ export function matchRules(
       if (name === 'supports' && !CSS.supports(condition)) return false;
     }
     try {
-      return element.matches(selector.replace(/::[\w-]+(?:\([^)]*\))?/g, ''));
+      // Lightning CSS writes the older `:before` form, which works the same.
+      return element.matches(
+        selector.replace(/::[\w-]+(?:\([^)]*\))?|:(?:before|after|first-line|first-letter)\b/g, ''),
+      );
     } catch {
       return false;
     }
   });
+}
+
+// A rule the runtime inserted for a value in a `${…}`. These aren't in the CSS
+// file, so the dev server doesn't know them, and only the page has them.
+export interface Generated {
+  className: string;
+  selector: string;
+  property: string;
+  value: string;
+  specificity: [number, number, number];
+  // Its place in the runtime's stylesheet. Later rules win.
+  index: number;
+}
+
+// The generated rules for these classes, from the page's adopted stylesheets,
+// which is where the runtime puts them.
+export function readGenerated(classes: string[]): Generated[] {
+  const wanted = new Set(classes);
+  const found: Generated[] = [];
+  let index = 0;
+  for (const sheet of document.adoptedStyleSheets ?? []) {
+    for (const rule of sheet.cssRules) {
+      const position = index++;
+      const { selectorText: selector, style } = rule as CSSStyleRule;
+      const className = /\.(_[\w-]+)/.exec(selector ?? '')?.[1];
+      const property = style?.[0];
+      if (className === undefined || !wanted.has(className) || !property?.startsWith('--'))
+        continue;
+      // Selectors the runtime writes have no strings, so these can be counted.
+      const bare = selector.replace(/:[:\w-]*\(/g, (match) => match.slice(0, -1) + ' ');
+      const ids = (bare.match(/#[\w-]+/g) ?? []).length;
+      const elements =
+        (bare.match(/::[\w-]+/g) ?? []).length +
+        (bare.match(/(?:^|[\s>+~,(])[a-zA-Z][\w-]*/g) ?? []).length;
+      const others = (bare.match(/\.[\w-]+|\[[^\]]*\]|(?<!:):[\w-]+/g) ?? []).length;
+      found.push({
+        className,
+        selector,
+        property,
+        value: style.getPropertyValue(property).trim(),
+        specificity: [ids, others, elements],
+        index: position,
+      });
+    }
+  }
+  return found;
 }
 
 // Whether the pane may run on a page: its hostname is this computer, or one the

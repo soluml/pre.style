@@ -6,12 +6,14 @@ import type { CnTable } from '@pre.style/core';
 import {
   createCompiler,
   findLibraries,
+  interpolatedBlock,
   isIdentifier,
   PreStyleError,
   readConfig,
 } from '@pre.style/core/compiler';
 import type {
   Block,
+  BlockVariable,
   CompiledStylesheet,
   Compiler,
   Lang,
@@ -21,14 +23,21 @@ import type {
   ResolvedLibrary,
 } from '@pre.style/core/compiler';
 import type { EnvironmentModuleNode, Plugin, ResolvedConfig, Rollup, ViteDevServer } from 'vite';
-import { FindError, findInHtml, findInScript, locateIn, SHEET_IMPORT } from './find.ts';
+import {
+  FindError,
+  findInComponent,
+  findInHtml,
+  findInScript,
+  locateIn,
+  SHEET_IMPORT,
+} from './find.ts';
 import type { CnCall, FoundBlock, FoundImport, ScriptAnalysis, SheetClass } from './find.ts';
 
 export type { LibraryConfig, PackageConfig };
 
 // Options about how the build writes its output. Options every tool must
 // agree on (`include`, `exclude`, `prependFiles`, `libraries`,
-// `quirksMode`, and `keyframeLocalization`) are set in the `pre.style` field
+// `quirksMode`, `keyframeLocalization`, and `customPropertyLocalization`) are set in the `pre.style` field
 // of the app's package.json.
 export interface PreStyleOptions {
   // Options passed through to Lightning CSS.
@@ -78,6 +87,10 @@ const RESOLVED_CN_ID = '\0virtual:pre.style/cn';
 // The dev CSS module. Its resolved ID has no `\0`, so Vite's CSS plugin
 // handles it (including HMR).
 const CSS_ID = 'virtual:pre.style.css';
+const RUNTIME_ID = '@pre.style/core/runtime';
+const RUNTIME_DEV_ID = '@pre.style/core/runtime/dev';
+// What a block with `${…}` calls.
+const DYNAMIC_LOCAL = '__pre_style_dynamic';
 const RESOLVED_CSS_ID = '/__pre.style.css';
 // Where the browser DevTools extension asks where classes are used, as
 // `?classes=A,B`. Bump the version when the response changes.
@@ -88,13 +101,33 @@ const toArray = (value: string | string[] | undefined) =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
 const cleanId = (id: string) => id.replace(/[?#].*$/, '');
 
-const block = (found: FoundBlock, file: string): Block => ({
-  code: found.code,
-  lang: found.lang,
-  file,
-  line: found.line,
-  column: found.column,
-});
+const block = (found: FoundBlock, file: string): Block => {
+  const { code, lang, line, column, interpolation } = found;
+  if (interpolation === undefined) return { code, lang, file, line, column };
+  return interpolatedBlock({
+    strings: interpolation.strings,
+    expressions: interpolation.expressions.map((expression) => expression.code),
+    lang,
+    file,
+    line,
+    column,
+  });
+};
+
+// The blocks in an HTML file. It has no JavaScript to run, so no runtime values.
+const htmlBlocks = (html: string, file: string): FoundBlock[] => {
+  const found = findInHtml(html);
+  for (const { code, line, column } of found)
+    if (code.includes('${'))
+      throw new PreStyleError(
+        `${file}:${line}:${column}: \`\${…}\` can't be used in HTML, because no code there could set the value. Use a constant, or a block in a script.`,
+        null,
+      );
+  return found;
+};
+
+const ASTRO_MESSAGE =
+  "`${…}` can't be used in an Astro component's frontmatter or template, because that code only runs on the server, so nothing could set the value in the browser. Use a client script or an island, or `style`.";
 
 // Vite and Rollup errors take a location, so pre.style's own file:line:col
 // prefix is left to them.
@@ -244,9 +277,15 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       if (analysis === null) return;
       if (source !== undefined) locateIn(analysis.blocks, source);
       const classes = new Map<FoundBlock, string>();
+      const variables = new Map<FoundBlock, BlockVariable[]>();
       for (const found of analysis.blocks) {
+        const expression = found.interpolation?.expressions[0];
+        if (expression !== undefined && ASTRO.test(id))
+          throw new FindError(ASTRO_MESSAGE, expression.line, expression.column);
         const b = block(found, file);
         classes.set(found, compiler.classString(b));
+        const blockVariables = compiler.variables(b);
+        if (blockVariables.length > 0) variables.set(found, blockVariables);
         track(context, compiler.dependencies(b), id);
       }
 
@@ -293,8 +332,51 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       for (const call of analysis.cnCalls)
         if (call.args !== null)
           s.overwrite(call.start, call.end, quoted(await resolveCall(call), quote));
-      for (const [found, value] of classes)
-        if (!resolved.has(found)) s.overwrite(found.start, found.end, quoted(value, quote));
+      for (const [found, value] of classes) {
+        if (resolved.has(found)) continue;
+        const blockVariables = variables.get(found);
+        if (blockVariables === undefined) {
+          s.overwrite(found.start, found.end, quoted(value, quote));
+          continue;
+        }
+        // Only the text around the expressions is replaced, so they keep their
+        // source maps, and each runs once, in order.
+        const { expressions } = found.interpolation!;
+        const list = blockVariables.map((variable) =>
+          JSON.stringify([
+            variable.name,
+            variable.slot.strings,
+            variable.slot.expressions,
+            ...(variable.selector !== null
+              ? [
+                  variable.property === `--${variable.name}` ? 0 : variable.property,
+                  variable.selector,
+                ]
+              : variable.property === `--${variable.name}`
+                ? []
+                : [variable.property]),
+          ]),
+        );
+        s.overwrite(
+          found.start,
+          expressions[0].start,
+          `${DYNAMIC_LOCAL}(${quoted(value, quote)},[`,
+        );
+        for (let i = 1; i < expressions.length; i++)
+          s.overwrite(expressions[i - 1].end, expressions[i].start, ',');
+        s.overwrite(expressions.at(-1)!.end, found.end, `],${list.join(',')})`);
+      }
+      // After any directives, such as `'use client'`, since a block's file
+      // always imports from `@pre.style/core`.
+      if (variables.size > 0) {
+        const name = app.config.quirksMode ? 'dynamicLowercase' : 'dynamic';
+        const from =
+          config.command === 'build' && config.isProduction ? RUNTIME_ID : RUNTIME_DEV_ID;
+        s.appendLeft(
+          analysis.imports[0].start,
+          `import { ${name} as ${DYNAMIC_LOCAL} } from ${JSON.stringify(from)};\n`,
+        );
+      }
       for (const statement of analysis.imports)
         s.overwrite(statement.start, statement.end, rewriteImport(statement));
       // The attributes are removed (browsers reject unknown types), and the
@@ -339,7 +421,9 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
         // Libraries are compiled from their source: not pre-bundled in dev,
         // and not left for Node to load on the server, so their blocks reach
         // this plugin.
-        optimizeDeps: { exclude: names },
+        // The runtime has no dependencies, so it needs no pre-bundling, which
+        // would reload the page when the first `${…}` is found.
+        optimizeDeps: { exclude: [...names, RUNTIME_ID, RUNTIME_DEV_ID] },
         ssr: { noExternal: names },
       };
     },
@@ -391,17 +475,21 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       const create = () =>
         createCompiler({
           prependFiles: app.config.prependFiles,
-          libraries: libraries.map(({ dir, prependFiles, keyframeLocalization }) => ({
-            dir,
-            prependFiles,
-            keyframeLocalization,
-          })),
+          libraries: libraries.map(
+            ({ dir, prependFiles, keyframeLocalization, customPropertyLocalization }) => ({
+              dir,
+              prependFiles,
+              keyframeLocalization,
+              customPropertyLocalization,
+            }),
+          ),
           lightningcss: options.lightningcss,
           sourceMap: options.sourceMap ?? config.command !== 'build',
           root: app.dir,
           warn: (message) => config.logger.warn(`[pre.style] ${message}`),
           quirksMode: app.config.quirksMode,
           keyframeLocalization: app.config.keyframeLocalization,
+          customPropertyLocalization: app.config.customPropertyLocalization,
           layer: options.layer,
         });
       // Dev names blocks on demand, as they're served.
@@ -447,16 +535,28 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
           // HTML's. Only counts depend on the scan, so a block Astro leaves
           // out costs no more than a longer name.
           let found: FoundBlock[] = [];
-          if (HTML.test(id)) found = findInHtml(code);
+          if (HTML.test(id)) found = htmlBlocks(code, id);
           else if (ASTRO.test(id)) {
-            if (code.includes('@pre.style/core')) found = findInHtml(code);
+            if (code.includes('@pre.style/core')) found = findInComponent(code);
             specifiers = imported;
           } else {
             const analysis = findInScript(id, code);
             found = analysis?.blocks ?? [];
             specifiers = analysis?.sheets.map((sheet) => sheet.specifier) ?? [];
           }
-          for (const b of found) compiler.scan(block(b, id));
+          for (const b of found) {
+            // A block with `${…}` in a client script has to be found here:
+            // Astro ships the server build's CSS. In a frontmatter or template
+            // it's an error when it's compiled, and text matching can find code
+            // samples, so one that doesn't compile is left for then.
+            if (b.interpolation !== undefined && ASTRO.test(id))
+              try {
+                compiler.scan(block(b, id));
+              } catch (error) {
+                if (!(error instanceof PreStyleError)) throw error;
+              }
+            else compiler.scan(block(b, id));
+          }
         } catch (error) {
           fail(this, error, id);
         }
@@ -511,7 +611,12 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
         return { code, map: { mappings: '' } };
       }
       if (id === RESOLVED_CN_ID) {
-        return `import { createCn } from '@pre.style/core';\nexport const cn = /* @__PURE__ */ createCn(${JSON.stringify(current().table)});\n`;
+        // Only apps with `${…}` load the runtime for this.
+        const cnVariables = JSON.stringify(compiler.cnVariables());
+        const cnTable = JSON.stringify(current().table);
+        return cnVariables === '{}'
+          ? `import { createCn } from '@pre.style/core';\nexport const cn = /* @__PURE__ */ createCn(${cnTable});\n`
+          : `import { createCn } from '@pre.style/core';\nimport { generatedClasses } from ${JSON.stringify(RUNTIME_ID)};\nexport const cn = /* @__PURE__ */ createCn(${cnTable}, generatedClasses(${cnVariables}));\n`;
       }
       if (id === RESOLVED_CSS_ID) {
         if (config.command === 'build') {
@@ -564,7 +669,7 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
         const revision = compiler.revision;
         const s = new MagicString(html);
         try {
-          for (const found of findInHtml(html))
+          for (const found of htmlBlocks(html, id))
             s.overwrite(found.start, found.end, compiler.classString(block(found, id)));
         } catch (error) {
           if (error instanceof PreStyleError) throw new Error(error.message, { cause: error });

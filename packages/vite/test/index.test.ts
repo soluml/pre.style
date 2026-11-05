@@ -2,7 +2,13 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { build, createLogger, createServer, defaultClientConditions } from 'vite';
+import {
+  build,
+  createLogger,
+  createServer,
+  defaultClientConditions,
+  defaultServerConditions,
+} from 'vite';
 import type { InlineConfig, Plugin, Rollup } from 'vite';
 import preStyle from '../src/index.ts';
 import type { PreStyleOptions } from '../src/index.ts';
@@ -282,7 +288,12 @@ describe('component libraries', () => {
       server: { middlewareMode: true, ws: false },
     });
     try {
-      assert.deepEqual(server.config.optimizeDeps.exclude, ['acme-ui', 'acme-icons']);
+      assert.deepEqual(server.config.optimizeDeps.exclude, [
+        'acme-ui',
+        'acme-icons',
+        '@pre.style/core/runtime',
+        '@pre.style/core/runtime/dev',
+      ]);
       assert.deepEqual(server.environments.ssr.config.resolve.noExternal, [
         'acme-ui',
         'acme-icons',
@@ -551,12 +562,25 @@ describe('errors', () => {
     );
   });
 
-  test('interpolation in a block', async () => {
+  test('a runtime value in a selector', async () => {
     writeFileSync(
       main,
-      "import { css } from '@pre.style/core';\nconst c = 'red';\nexport const f = css`color: ${c}`;\n",
+      "import { css } from '@pre.style/core';\nconst c = 'a';\nexport const f = css`\n  .${c} { color: red; }`;\n",
     );
-    await assert.rejects(buildFixture('errors'), /Blocks cannot contain \$\{…\} interpolation/);
+    await assert.rejects(
+      buildFixture('errors'),
+      (error: Error) =>
+        error.message.includes(`${main}:4:4: `) &&
+        error.message.includes("can only be used in a declaration's value"),
+    );
+  });
+
+  test('a block in a runtime value', async () => {
+    writeFileSync(
+      main,
+      "import { css } from '@pre.style/core';\nexport const f = css`width: ${css`color: red;`};`;\n",
+    );
+    await assert.rejects(buildFixture('errors'), /can't be used in another block's/);
   });
 
   test('invalid CSS reports the file and position', async () => {
@@ -713,5 +737,165 @@ describe('dev', () => {
     } finally {
       await server.close();
     }
+  });
+});
+
+// Compiles an Astro component to its frontmatter, as far as these tests need.
+const fakeAstro: Plugin = {
+  name: 'fake-astro',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.endsWith('.astro')) return;
+    return code.split('---')[1];
+  },
+};
+
+const outputJs = (files: Map<string, string>) =>
+  [...files]
+    .filter(([name]) => name.endsWith('.js'))
+    .map(([, code]) => code)
+    .join('\n');
+const outputCss = (files: Map<string, string>) =>
+  [...files]
+    .filter(([name]) => name.endsWith('.css'))
+    .map(([, code]) => code)
+    .join('\n');
+
+describe('runtime values', () => {
+  test('a block with values calls the runtime', async () => {
+    const files = await buildFixture('runtime-values');
+    const code = outputJs(files);
+    assert.match(outputCss(files), /@property --\w+ \{\s*syntax: "\*";\s*inherits: false;?\s*\}/);
+    assert.match(outputCss(files), /width: var\(--\w+, 120px\)/);
+    assert.match(code, /adoptedStyleSheets/);
+    assert.doesNotMatch(code, /css`/);
+  });
+
+  test('production builds have short errors', async () => {
+    const code = outputJs(await buildFixture('runtime-values'));
+    assert.match(code, /https:\/\/pre\.style\/errors\/1/);
+    assert.doesNotMatch(code, /must be strings or numbers/);
+  });
+
+  test('`cn` with a value runs in the browser and knows generated classes', async () => {
+    const code = outputJs(await buildFixture('runtime-values'));
+    assert.match(code, /createCn|generatedClasses|Object\.hasOwn/);
+    assert.match(code, /super\.get/);
+  });
+
+  test('expressions run once, in order, with source maps', async () => {
+    const files = await buildFixture(
+      'runtime-values',
+      {},
+      { build: { minify: false, sourcemap: true } },
+    );
+    const code = outputJs(files);
+    assert.match(code, /order\.push\("first"\),\s*order\.push\("second"\)/);
+    assert.equal(code.match(/order\.push\("first"\)/g)!.length, 1);
+    const map = [...files].find(([name]) => name.endsWith('.js.map'))![1];
+    assert.ok(JSON.parse(map).sources.some((source: string) => source.endsWith('src/main.ts')));
+  });
+
+  test('apps without `${…}` ship no runtime', async () => {
+    const code = outputJs(await buildFixture('basic'));
+    for (const text of [
+      'adoptedStyleSheets',
+      'insertRule',
+      'setProperty',
+      'pre.style error',
+      'super.get',
+    ])
+      assert.ok(!code.includes(text), text);
+  });
+
+  test('`cn` without `${…}` ships no runtime', async () => {
+    const code = outputJs(await buildFixture('runtime-cn-only'));
+    assert.match(code, /createCn|Object\.entries/);
+    for (const text of ['adoptedStyleSheets', 'super.get', 'pre.style error'])
+      assert.ok(!code.includes(text), text);
+  });
+
+  test("`${…}` in an Astro component's frontmatter is an error, not invalid CSS", async () => {
+    const card = `${fixture('runtime-astro')}/src/Card.astro`;
+    await assert.rejects(
+      build({
+        ...config('runtime-astro', {}),
+        plugins: [...config('runtime-astro', {}).plugins!, fakeAstro],
+      }),
+      (error: Error) =>
+        error.message.includes(card) && error.message.includes("Astro component's frontmatter"),
+    );
+  });
+
+  test("a value's atom is in the scan, for an Astro client script", async () => {
+    const file = `${fixture('runtime-astro')}/src/Card.astro`;
+    const original = readFileSync(file, 'utf8');
+    const script =
+      'export const card = "a";\n---\n<script>\n  css`color: ${c}; margin-top: ${m}px;`;\n</script>\n';
+    writeFileSync(file, `---\nimport { css } from '@pre.style/core';\n${script}`);
+    try {
+      // Only the frontmatter is compiled here, as the fake compiler can't split
+      // scripts out, so the scan is what wrote this to the CSS.
+      const files = await buildFixture(
+        'runtime-astro',
+        {},
+        { plugins: [...config('runtime-astro', {}).plugins!, fakeAstro] },
+      );
+      assert.match(outputCss(files), /margin-top: var\(--\w+\)/);
+    } finally {
+      writeFileSync(file, original);
+    }
+  });
+
+  test('`${…}` in HTML is an error', async () => {
+    const file = `${fixture('runtime-html')}/index.html`;
+    await assert.rejects(
+      buildFixture('runtime-html'),
+      (error: Error) =>
+        error.message.includes(`${file}:`) && error.message.includes("can't be used in HTML"),
+    );
+  });
+
+  test('the dev server uses full errors, and the server renders class strings', async () => {
+    const server = await createServer({
+      ...config('runtime-values', {}),
+      server: { middlewareMode: true, ws: false },
+      appType: 'custom',
+      // The server resolves the runtime to its TypeScript source too.
+      ssr: {
+        resolve: {
+          conditions: ['pre.style-source', ...defaultServerConditions],
+          externalConditions: ['pre.style-source', 'node'],
+        },
+      },
+    });
+    try {
+      const module = await server.ssrLoadModule('/src/main.ts');
+      assert.match(module.withValue, /^\S+( \S+)* _\S+$/);
+      assert.equal(module.withValue, module.again);
+      const nothing = module.withNull as string;
+      assert.doesNotMatch(nothing, /(^| )_/);
+      assert.throws(() => module.invalid(), /must be strings or numbers/);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe('custom property localization', () => {
+  test('is set in package.json, and renames what blocks declare', async () => {
+    const files = await buildFixture('local-custom-properties');
+    const css = outputCss(files);
+    const code = outputJs(files);
+    assert.doesNotMatch(css, /--gap|--brand/);
+    assert.match(css, /var\(--shared\)/);
+    assert.doesNotMatch(code, /--brand|pre\.style-variable/);
+    assert.doesNotMatch(css, /pre\.style-variable/);
+  });
+
+  test('a value of the wrong type fails', async () => {
+    await withField('basic', { customPropertyLocalization: 'yes' }, () =>
+      assert.rejects(buildFixture('basic'), /customPropertyLocalization/),
+    );
   });
 });

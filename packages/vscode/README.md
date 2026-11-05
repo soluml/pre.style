@@ -12,7 +12,7 @@ Editor support for [pre.style](https://pre.style), the zero-runtime CSS-in-JS to
 - Astro frontmatter, template expressions such as ``class={css`…`}``, and `<script>` tags (with the [Astro extension](https://marketplace.visualstudio.com/items?itemName=astro-build.astro-vscode) installed)
 - HTML `class` attributes, such as ``class="css`…`"``, and `<script>` tags
 
-Inside a block, toggling a comment inserts `/* … */`.
+Inside a block, toggling a comment inserts `/* … */`, and `${…}` is colored as JavaScript.
 
 ### CSS completion in blocks
 
@@ -67,6 +67,7 @@ Uninstalling leaves your project files as they are, including any `tsconfig.json
 ## Known limitations
 
 - Blocks are found by their tag, so they must use the `css` or `scss` name: a renamed import (`import { css as style }`) isn't recognized.
+- `${…}` in a block is only colored and skipped by completion. The extension adds no other JavaScript features there.
 - While you type a `{` without its closing `}`, the rest of the file is colored as CSS until you close it.
 - The [styled-components extension](https://marketplace.visualstudio.com/items?itemName=styled-components.vscode-styled-components) also colors `` css` `` templates. If you have both installed, either may color a block.
 

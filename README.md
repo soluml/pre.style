@@ -50,7 +50,7 @@ After the build, `button` is a plain string, `"B C E D A G F"`. The block is rep
 }
 ```
 
-- **No runtime.** Blocks are replaced with class strings during the build. Nothing is shipped to parse or inject CSS.
+- **No runtime by default.** Blocks are replaced with class strings during the build, and nothing is shipped to parse or inject CSS. The exception is [runtime values](#runtime-values), which you opt in to by writing `${…}`.
 - **Small CSS.** Each declaration is written once, however many components use it, so the CSS file grows slowly as your project grows.
 - **Just CSS.** Blocks are standard CSS (with nesting) or SCSS. There's no new syntax to learn.
 - **Fast.** Built on [Lightning CSS](https://lightningcss.dev/). Every block is parsed once, in one process.
@@ -161,7 +161,328 @@ const title = scss`
 `;
 ```
 
-Blocks can't contain `${…}` interpolation. pre.style needs to know every block's CSS at build time. Share values with [prepended files](#sharing-values-with-prepended-files) instead.
+### Runtime values
+
+Use `${…}` for values that are only known while your app runs, such as props:
+
+```jsx
+function Bar({ width }) {
+  const bar = css`
+    width: ${width}px;
+  `;
+  return <div className={bar} />;
+}
+```
+
+Each `${…}` becomes a custom property, and the block's CSS is still written to the CSS file during the build:
+
+```css
+@property --A {
+  syntax: "*";
+  inherits: false;
+}
+
+.A {
+  width: var(--A);
+}
+```
+
+In the browser, a small runtime generates one class for each distinct value and inserts its rule once. `bar` is still a plain string, `"A _A3fK9"`, so it works anywhere a class string does, including `cn`.
+
+```css
+._A3fK9 {
+  --A: 240px;
+}
+```
+
+> [!IMPORTANT]
+> **`${…}` adds JavaScript to your bundle.** It's the one part of pre.style with a runtime, and only apps that use `${…}` load it. Everything else stays static, so use `${…}` only for values that change at runtime. For constants, such as design tokens, use [Sass or prepended files](#sharing-values-with-prepended-files), which cost nothing in the browser. `${tokens.red}` uses the runtime, even though its value never changes.
+
+The generated `@property` keeps the variable from inheriting. Variables are shared by every block with the same declaration, so without it, an element with no value of its own would take its parent's.
+
+#### Default values
+
+Write `var()` around a value to give it a default:
+
+```js
+css`
+  width: var(${width}px, 120px);
+  color: var(${color}, currentColor);
+  background-color: var(${color}, var(--surface));
+`;
+```
+
+```css
+.A {
+  width: var(--A, 120px);
+}
+```
+
+The default can be any CSS. It's used when the value is `null` or `undefined`, in which case no class is generated, and until the runtime sets the value in the browser (see [Server rendering](#server-rendering)). A value of the wrong type doesn't use it: `width: var(${"red"}, 120px)` resets `width`. To catch those, use [`type()`](#typed-values-with-type).
+
+#### Several values
+
+Each `${…}` and the text touching it is one value, with its own variable:
+
+```js
+css`
+  color: #${hex};
+  margin-top: calc(${gap}px * 2);
+  background-image: linear-gradient(${from}, ${to});
+`;
+```
+
+Values inside one `var()` share a variable, and so share a default:
+
+```js
+css`
+  margin: var(${y}px ${x}px, auto);
+`;
+```
+
+```css
+.A {
+  margin: var(--A, auto);
+}
+```
+
+Values work in nested selectors too, including pseudo-elements and other elements. The generated class's rule uses the same selector, so the value reaches them:
+
+```js
+css`
+  & > * {
+    margin-top: ${gap}px;
+  }
+
+  & + li {
+    color: ${color};
+  }
+`;
+```
+
+```css
+/* Inserted by the runtime */
+._A3fK9 > * {
+  --A: 8px;
+}
+```
+
+#### Strings and URLs
+
+Write quotes around `${…}` for a string, with any text you like. The runtime escapes the value, and numbers work too. `url()` needs its quotes:
+
+```js
+css`
+  background-image: url("/img/${name}.png");
+
+  &::before {
+    content: var("Count: ${count}", "Loading");
+  }
+`;
+```
+
+```css
+/* Inserted by the runtime */
+._A3fK9 {
+  --A: url("/img/photo.png");
+}
+
+._B7xQ2::before {
+  --B: "Count: 5";
+}
+```
+
+The whole string is the value, so a default goes around it, as above. `content: ${x}` without quotes doesn't add any: use it for values that are already CSS, such as `none` or `counter(n)`. In `scss` blocks, `#{…}` can't be in the same value as `${…}`.
+
+#### Custom properties
+
+Name a custom property to share a value: with other elements, which inherit it, with something else that reads that name, or across several declarations in a block. For a value that's only used on one element, write `${…}` directly instead. A name is global, so two blocks using the same one can affect each other. To avoid that, use distinctive names, or [`customPropertyLocalization`](#local-custom-properties).
+
+A custom property set directly on the element is set by name. It needs no generated variable or `@property`, only the generated class:
+
+```js
+const badge = css`
+  --brand: ${color};
+  color: var(--brand);
+`;
+```
+
+```css
+.A {
+  color: var(--brand);
+}
+
+/* Inserted by the runtime */
+._B7xQ2 {
+  --brand: #00f;
+}
+```
+
+To give it a default, write `var()` around the value, or register it with `@property`, whose `initial-value` is the default. Write the rule yourself for full control, such as `inherits: true`:
+
+```js
+css`
+  @property --brand {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: #f00;
+  }
+
+  --brand: ${color};
+  color: var(--brand);
+`;
+```
+
+With `inherits: true`, an element with no value of its own takes its parent's rather than the `initial-value`.
+
+#### Typed values with `type()`
+
+Add `type()` to say what kind of value a variable holds, the same way as in [`attr()`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/attr). It takes any [`@property` syntax](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@property/syntax):
+
+```js
+css`
+  width: var(${width}px type(<length>), 120px);
+  height: var(${height} type(<length> | auto), auto);
+  border-color: var(${color} type(<color>), red);
+  translate: var(${x}px ${y}px type(<length>+), 0px);
+`;
+```
+
+The default moves to the variable's `initial-value`, and the variable gets the type:
+
+```css
+@property --A {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 120px;
+}
+
+.A {
+  width: var(--A);
+}
+```
+
+On a custom property set directly on the element, it registers that property, so you don't have to write the `@property` yourself:
+
+```js
+css`
+  --brand: var(${color} type(<color>), #f00);
+  color: var(--brand);
+  transition: --brand 200ms;
+`;
+```
+
+```css
+@property --brand {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: red;
+}
+```
+
+Typed values are larger, and each type and default gets its own variable, so they're opt-in. In return:
+
+- A value of the wrong type uses the default, instead of resetting the property.
+- The variable can be transitioned and animated, as in the example above.
+- The default is checked against the type during the build.
+
+A typed value must have a default, which can't use `${…}`, `var()`, or anything that depends on where it's used, such as `em`, `rem`, container units, `env()`, or `attr()`: browsers ignore the whole `@property` rule otherwise, so the build fails. Browsers without `@property` (before July 2024) have no default for a typed value until the runtime sets it.
+
+#### Animations
+
+`@keyframes`, `@position-try`, and `@function` read variables from the element using them, so they can hold values too:
+
+```js
+const bar = css`
+  @keyframes grow {
+    to {
+      width: var(${width}px, 200px);
+    }
+  }
+
+  animation: grow 1s forwards;
+`;
+```
+
+The generated class has to be on the element that runs the animation, since variables don't inherit.
+
+#### Using `cn`
+
+Blocks with values work with `cn`, and the later value wins. A `cn` call with one runs in the browser, so it includes the lookup table:
+
+```js
+cn(
+  css`width: ${small}px;`,
+  css`width: ${large}px;`,
+);
+```
+
+A block whose value is `null` or `undefined` adds no class, so it doesn't clear an earlier block's value of the same variable.
+
+Use `cn` to combine blocks that set the same declaration, rather than joining their class strings yourself. Blocks with the same declaration share a variable, so with `` `${a} ${b}` `` the value inserted last wins, whichever order the classes are in.
+
+#### Where values can go
+
+`${…}` becomes a `var()`, so it can only go where `var()` works: in a declaration's value. These fail the build:
+
+```js
+css`
+  .${name} { color: red; }                 /* selectors */
+  margin-${side}: 0;                       /* property names */
+  @media (min-width: ${bp}px) { top: 0; }  /* at-rule conditions, see Sharing media queries */
+  @font-face { font-weight: ${weight}; }   /* @font-face, @property, @page, and similar */
+  background-image: url(${path});          /* url() without quotes */
+`;
+```
+
+Values must be strings or numbers, or `null` or `undefined` to use the default. Anything else, including `false`, `NaN`, and objects, [throws an error](#runtime-errors) when the block runs, so write `${open ? width : null}` rather than `${open && width}`. To combine blocks, use `cn` rather than interpolating one into another.
+
+#### Server rendering
+
+The server renders the same class strings as the browser, so hydration matches, but it doesn't write the generated rules. The page uses the defaults until the runtime sets the values in the browser, so pick a default close to the usual value to avoid a visible jump. Without a default, the declaration has no effect until then.
+
+Values need code that runs in the browser. `${…}` fails the build in HTML, and in the frontmatter and templates of Astro components, where it could never be set (Astro client scripts are fine). React Server Components have the same problem, but the build can't detect it there: use client components for blocks with values.
+
+#### Browser support
+
+Runtime values work in every [Baseline](https://developer.mozilla.org/en-US/docs/Glossary/Baseline/Compatibility) browser. They need [constructable stylesheets](https://caniuse.com/mdn-api_document_adoptedstylesheets) and [`@property`](https://caniuse.com/mdn-css_at-rules_property), so they fully work from:
+
+| Chrome and Edge | Firefox | Safari and iOS Safari | Samsung Internet |
+| --- | --- | --- | --- |
+| 99 | 128 | 16.4 | 18 |
+
+In older browsers:
+
+- **Without `@property`** (Firefox 101 to 127), values work, but an element with no value of its own takes its parent's instead of its default, and a typed value has no default.
+- **Without constructable stylesheets, or where they can't be added to** (Chrome before 99, Firefox before 101, Safari before 16.4), values aren't set, so the page keeps its defaults.
+
+`@keyframes` works wherever these do. `@position-try` is newer: it needs Chrome 125, Firefox 147, or Safari 26. `@function` isn't Baseline: it needs Chrome 139, and isn't yet in Firefox or Safari, so a block using it there keeps the rest of its styles but not the function's.
+
+#### When to use `style` instead
+
+A block compiles to a class string, so the runtime can't tell which element it's for. That's why each distinct value gets its own class, rather than one class whose value changes: two elements from the same block can have different values, as in a list. So the class changes with the value, and every new value adds a rule that's never removed.
+
+That suits values from a small set, such as a theme color or a chosen size, where going back to a value reuses its class. For values that change constantly, such as a counter, a drag position, or anything set per frame, use the `style` attribute and read it from a static block. The class never changes, no rules are added, the server renders the real value, and no runtime is needed:
+
+```jsx
+const box = css`
+  transform: translateX(var(--x, 0));
+`;
+
+<div className={box} style={{ "--x": `${x}px` }} />;
+```
+
+| | `${…}` | `style` |
+| --- | --- | --- |
+| The class | Changes with the value | Stays the same |
+| CSS rules | One per distinct value, kept | None added |
+| On the server | The default, until the runtime runs | The real value |
+| In `cn` | Later values win | Not involved |
+| Runtime | Needed | Not needed |
+| In pseudo-elements and other elements | Reaches them | Only if the property inherits |
+| Best for | Values from a small set | Values that change constantly |
+
+The demos' Interpolation pages show both side by side.
 
 ### Selectors
 
@@ -207,6 +528,41 @@ By default, keyframes names are global, so two blocks that each define a differe
 - Keyframes from [prepended files](#sharing-values-with-prepended-files) are localized too. Every block gets the same copy, so prepended files are the way to share keyframes between blocks.
 - Names a block or file doesn't define are left as they are, so `animation-name: spin` still refers to a global `@keyframes spin`, for example one in a CSS file that pre.style doesn't process. That also means a block can't use keyframes another block defines.
 - Names in custom properties (`--anim: spin`) aren't renamed, because pre.style can't tell they name keyframes.
+
+#### Local custom properties
+
+By default, custom properties are global, so two blocks that each set `--gap` on nested elements affect each other. Set `"customPropertyLocalization": true` in your `package.json`'s `pre.style` field to give each custom property a generated name:
+
+```js
+const card = css`
+  --gap: 8px;
+  padding: var(--gap);
+`;
+```
+
+```css
+.A {
+  --B: 8px;
+}
+
+.C {
+  padding: var(--B);
+}
+```
+
+- A name a block or stylesheet file declares (with `--x: …` or `@property --x`) gets a generated name there, including in `var()`, `transition-property`, `will-change`, `@keyframes`, and `@container style()`. In a stylesheet file, every class in the file shares it.
+- Names it only reads are left as they are, so `color: var(--token)` still refers to a global `--token`.
+- Names from [prepended files](#sharing-values-with-prepended-files) are left as they are, even when a block sets them, so they're the way to share custom properties.
+- Other names that start with `--`, such as `anchor-name` and `@custom-media`, aren't custom properties, and aren't renamed.
+- [Runtime values](#custom-properties) follow: `--brand: ${color}` sets the generated name.
+
+> [!WARNING]
+> This changes what a block's CSS means, and failures are silent:
+>
+> - `style={{ "--gap": "16px" }}` no longer overrides a block's `--gap`, since the block's name has changed. Neither does `getPropertyValue("--gap")` find it.
+> - A child block can't read a `--gap` its parent block sets. Put a value that's shared between blocks in a prepended file.
+
+**It's for avoiding collisions, not for smaller output.** Blocks stop sharing classes for the same declaration, and in our tests that usually made the CSS larger: 50 blocks setting `--gap: 8px` grew by about 170%, gzipped. Long names used once are the exception: they shrink, by about 10% gzipped. Most projects don't need this.
 
 ### `composes` in blocks
 
@@ -420,6 +776,45 @@ An array applies the files to every block. An object applies `css` files only to
 
 Rules the files output, such as `:root { --space: 4px }`, appear in the CSS file once. Keep prepended files to things that don't output CSS, or output it once (variables, mixins, custom properties). Large libraries slow the build down.
 
+### Sharing media queries
+
+Use Sass variables to share media queries. They need `scss` blocks, and they compile to ordinary `@media` rules:
+
+```scss
+// src/styles/_variables.scss, in prependFiles.scss
+$md: 768px;
+```
+
+```js
+scss`
+  flex-direction: column;
+
+  @media (min-width: $md) {
+    flex-direction: row;
+  }
+`;
+```
+
+`@custom-media` isn't resolved by pre.style. It's copied to the output as written, and no browser supports it by default yet, so `@media (--md)` rules don't apply. To use it anyway, pass the output CSS through another tool that resolves it, such as another Lightning CSS run:
+
+```js
+import { Features, transform } from 'lightningcss';
+
+const { code } = transform({
+  filename: 'pre.style.css',
+  code: Buffer.from(css),
+  drafts: { customMedia: true },
+  include: Features.CustomMediaQueries,
+});
+```
+
+or PostCSS with [`postcss-custom-media`](https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-custom-media).
+
+Either way, pre.style has already written the file by then, and it treats an alias as its own query:
+
+- Aliases aren't sorted with `min-width` queries, so an alias for a wider breakpoint can come before a narrower query, which then wins. Check the order of the output.
+- `cn` doesn't treat `(--md)` and the query it stands for as conflicting, so it keeps classes from both.
+
 ## Component libraries
 
 A component library styled with pre.style ships its blocks uncompiled, and each app's pre.style plugin compiles them along with the app's own. The library's classes share names and the CSS file with the app's, so a `color: red` in the library and one in the app are the same class, and `cn` resolves conflicts between them.
@@ -471,6 +866,7 @@ A library's class names depend on the whole app, so they differ between apps. Do
 | `exclude`              |                              | Globs removed from `include`.                                                                                                                                                                                                                     |
 | `prependFiles`         |                              | Files added to the start of the library's blocks and stylesheet files, relative to the package. They apply only to the library's, not the app's, so the library's tokens and mixins are always available to it and never leak into the app.       |
 | `keyframeLocalization` | `false`                      | Give each `@keyframes` in the library's blocks and stylesheet files a generated name. See [Local keyframes](#local-keyframes). The library's setting applies to its blocks, whatever the app sets, since the library's styles are written for it. |
+| `customPropertyLocalization` | `false`                      | Give each custom property declared in the library's blocks and stylesheet files a generated name, used only there. See [Local custom properties](#local-custom-properties). |
 
 `"pre.style": true` uses the defaults. A library's field uses the same name and shape as an app's (see [Configuration](#configuration)). `libraries` and `quirksMode` only apply to the app, so in a library's field they're ignored, with a warning. A package that is both, such as a library with its own demo app, is read as the app when it's the Vite root, and as a library when it's a dependency.
 
@@ -568,6 +964,7 @@ Options every tool that reads your styles has to agree on (the bundler plugin, a
 | `libraries`            |                                                   | Component libraries to compile, by package name, in addition to dependencies with a `pre.style` field. A config replaces the package's field, `true` uses the defaults, and `false` leaves the package out. See [Component libraries](#component-libraries). |
 | `quirksMode`           | `false`                                           | **You probably don't want this.** Use lowercase class names only, for pages in quirks mode. Names get longer. See [Quirks mode](#quirks-mode).                                                                                                               |
 | `keyframeLocalization` | `false`                                           | Give each `@keyframes` in the app's blocks and stylesheet files a generated name, used only in the block or file that defines it. See [Local keyframes](#local-keyframes). Libraries use their own setting.                                                  |
+| `customPropertyLocalization` | `false`                                           | Give each custom property declared in the app's blocks and stylesheet files a generated name, used only there. See [Local custom properties](#local-custom-properties). |
 
 The plugin warns about keys it doesn't know, and fails the build on values of the wrong type. For completion and validation in your editor, `@pre.style/core` includes a JSON Schema for the field, at `node_modules/@pre.style/core/package.schema.json`. In VS Code, add it to your settings:
 
@@ -650,11 +1047,20 @@ The build fails, with the file, line, and column, when:
 
 - a block has invalid CSS syntax;
 - Sass fails to compile an `scss` block;
-- a block contains `${…}` interpolation;
+- a block has `${…}` anywhere but a declaration's value, or in HTML or an Astro component's frontmatter or template (see [Where values can go](#where-values-can-go) and [Server rendering](#server-rendering));
+- a `type()` has no default, or its default is invalid for the type or depends on where it's used;
 - `css` or `scss` is used other than as a tagged template;
 - a project has an `scss` block or file but Sass isn't installed;
 - a stylesheet file has invalid CSS, or fails to compile with Sass;
 - `composes` comes after other declarations, is used in a nested selector or at-rule, names a class or file that doesn't exist, or forms a cycle.
+
+### Runtime errors
+
+[Runtime values](#runtime-values) are checked in the browser and on the server. Outside production builds, errors have full messages. To keep the runtime small, production builds only have a number, the value's type, and a link to [a page that explains it](https://pre.style/errors):
+
+| Error | Meaning |
+| --- | --- |
+| [`pre.style error 1 (<type>)`](https://pre.style/errors/1) | A `${…}` value wasn't a string or a finite number, or `null` or `undefined` to use the default. `number` means it was `NaN` or `Infinity`. For a condition, write `${open ? width : null}` rather than `${open && width}`. |
 
 ## Known limitations
 

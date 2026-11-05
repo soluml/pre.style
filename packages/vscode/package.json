@@ -87,6 +87,21 @@
         }
       },
       {
+        "scopeName": "inline.pre-style.expression",
+        "path": "./syntaxes/inline-expression.tmLanguage.json",
+        "injectTo": [
+          "source.js",
+          "source.js.jsx",
+          "source.ts",
+          "source.tsx",
+          "text.html.basic",
+          "source.astro"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.expression.pre-style": "javascript"
+        }
+      },
+      {
         "scopeName": "inline.pre-style.html",
         "path": "./syntaxes/inline-html.tmLanguage.json",
         "injectTo": [

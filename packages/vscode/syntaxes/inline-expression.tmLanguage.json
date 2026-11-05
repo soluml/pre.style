@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tmlanguage.json",
+  "name": "${…} in pre.style blocks",
+  "scopeName": "inline.pre-style.expression",
+  "comment": "An injection, so it applies at any depth in a block, including in the rules and values that come from the CSS and Sass grammars.",
+  "injectionSelector": "L:meta.embedded.block.pre-style -meta.embedded.expression.pre-style",
+  "patterns": [
+    {
+      "begin": "\\$\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.template-expression.begin.js" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.template-expression.end.js" }
+      },
+      "contentName": "meta.embedded.expression.pre-style source.js",
+      "patterns": [{ "include": "source.js#expression" }]
+    }
+  ]
+}

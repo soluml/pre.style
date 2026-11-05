@@ -1,0 +1,8 @@
+{
+  "name": "fixture-local-custom-properties",
+  "private": true,
+  "type": "module",
+  "pre.style": {
+    "customPropertyLocalization": true
+  }
+}

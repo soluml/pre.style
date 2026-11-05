@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { buildView, classesToFetch, compareCascade, editorUrl, fileCount } from '../src/model.ts';
+import {
+  buildView,
+  classesToFetch,
+  compareCascade,
+  editorUrl,
+  fileCount,
+  withGenerated,
+} from '../src/model.ts';
 import type { Rule } from '../src/model.ts';
 
 const rule = (fields: Partial<Rule> & { className: string }): Rule => ({
@@ -285,5 +292,129 @@ describe('helpers', () => {
       editorUrl('/app/__open-in-editor', { file: '/s p/A.tsx', path: '', line: 5, column: 18 }),
       '/app/__open-in-editor?file=%2Fs%20p%2FA.tsx%3A5%3A18',
     );
+  });
+});
+
+const generated = (fields: Partial<Parameters<typeof withGenerated>[1][number]> = {}) => ({
+  className: '_A1234',
+  selector: '._A1234',
+  property: '--A',
+  value: '240px',
+  specificity: [0, 1, 0] as [number, number, number],
+  index: 0,
+  ...fields,
+});
+
+describe('pseudo-elements', () => {
+  test('the older and newer forms share a group', () => {
+    const view = buildView(
+      [
+        rule({ className: 'a', selector: '.a:before', property: 'content' }),
+        rule({ className: 'b', selector: '.b::before', property: '--b' }),
+        rule({ className: 'c', selector: '.c:after', property: 'content' }),
+      ],
+      [true, true, true],
+      ['a', 'b', 'c'],
+      '',
+    );
+    assert.deepEqual(
+      view.pseudo.map(({ name, rules }) => [name, names(rules).toSorted()]),
+      [
+        ['::after', ['c']],
+        ['::before', ['a', 'b']],
+      ],
+    );
+    assert.deepEqual(view.applied, []);
+  });
+
+  test('a pseudo-class is not one', () => {
+    const view = buildView([rule({ className: 'a', selector: '.a:hover' })], [true], ['a'], '');
+    assert.deepEqual(names(view.applied), ['a']);
+  });
+});
+
+describe('withGenerated', () => {
+  const reader = rule({
+    className: 'B',
+    declaration: 'width: var(--A, 120px)',
+    property: 'width',
+    sources: [at('a.tsx', 3), at('b.tsx', 9)],
+  });
+
+  test('adds a rule, with the value as its declaration', () => {
+    const [, added] = withGenerated([reader], [generated()]);
+    assert.equal(added.className, '_A1234');
+    assert.equal(added.declaration, '--A: 240px');
+    assert.equal(added.property, '--A');
+    assert.equal(added.generated, true);
+  });
+
+  test('takes its sources from the rules that read its variable', () => {
+    const [, added] = withGenerated([reader], [generated()]);
+    assert.deepEqual(added.sources, reader.sources);
+  });
+
+  test('a similar name is not a read', () => {
+    const other = rule({ className: 'C', declaration: 'width: var(--AB)', sources: [at('c', 1)] });
+    assert.deepEqual(withGenerated([other], [generated()])[1].sources, []);
+  });
+
+  test('a rule setting the same named property counts', () => {
+    const named = rule({
+      className: 'D',
+      declaration: '--brand: red',
+      property: '--brand',
+      sources: [at('d', 1)],
+    });
+    const [, added] = withGenerated([named], [generated({ property: '--brand' })]);
+    assert.deepEqual(added.sources, named.sources);
+  });
+
+  test('places are listed once', () => {
+    const twin = { ...reader, className: 'E' };
+    assert.equal(withGenerated([reader, twin], [generated()])[2].sources.length, 2);
+  });
+
+  test('comes after the CSS file, and later values win', () => {
+    const rules = withGenerated(
+      [rule({ className: 'F', property: '--A', declaration: '--A: 1px', order: 500 })],
+      [generated({ index: 0 }), generated({ className: '_A5678', index: 1 })],
+    );
+    assert.deepEqual(names(rules.toSorted(compareCascade)), ['_A5678', '_A1234', 'F']);
+  });
+
+  test('the view groups them like other rules, and marks what they override', () => {
+    const rules = withGenerated(
+      [reader],
+      [
+        generated(),
+        generated({ className: '_A5678', index: 1, value: '9px' }),
+        generated({
+          className: '_B1234',
+          selector: '._B1234::before',
+          property: '--B',
+          value: '"x"',
+          specificity: [0, 1, 1],
+          index: 2,
+        }),
+      ],
+    );
+    const view = buildView(
+      rules,
+      [true, true, true, true],
+      ['B', '_A1234', '_A5678', '_B1234'],
+      '',
+    );
+    assert.deepEqual(names(view.applied), ['_A5678', '_A1234', 'B']);
+    assert.equal(view.applied[1].overridden, true);
+    assert.deepEqual(
+      view.pseudo.map(({ name }) => name),
+      ['::before'],
+    );
+    assert.deepEqual(names(view.pseudo[0].rules), ['_B1234']);
+  });
+
+  test('no generated rules changes nothing', () => {
+    assert.deepEqual(withGenerated([reader], []), [reader]);
   });
 });

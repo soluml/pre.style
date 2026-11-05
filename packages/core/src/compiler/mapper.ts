@@ -46,13 +46,17 @@ async function openProject(params: {
   const compiler = createCompiler({
     root: app.dir,
     prependFiles: app.config.prependFiles,
-    libraries: libraries.map(({ dir, prependFiles, keyframeLocalization }) => ({
-      dir,
-      prependFiles,
-      keyframeLocalization,
-    })),
+    libraries: libraries.map(
+      ({ dir, prependFiles, keyframeLocalization, customPropertyLocalization }) => ({
+        dir,
+        prependFiles,
+        keyframeLocalization,
+        customPropertyLocalization,
+      }),
+    ),
     quirksMode: app.config.quirksMode,
     keyframeLocalization: app.config.keyframeLocalization,
+    customPropertyLocalization: app.config.customPropertyLocalization,
     warn: () => {},
   });
   projects.set(params.projectHandle, compiler);

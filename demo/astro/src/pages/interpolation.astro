@@ -1,0 +1,43 @@
+---
+import { ColorPicker, StyleCounter } from 'pre.style-demo-react-ui';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Interpolation">
+  <h1>Interpolation</h1>
+  <p>
+    There are two ways to set a value at runtime. They suit different values, and the class shown
+    under each example shows the difference.
+  </p>
+  <h2><code>{'${…}'}</code>, for values from a small set</h2>
+  <p>
+    Each distinct value gets its own generated class and rule, so the class changes with the value.
+    Going back to a color reuses its class. It works with <code>cn</code>, but each new value adds a
+    rule that's never removed. The server renders the block's default until the runtime takes over
+    in the browser.
+  </p>
+  <ColorPicker client:load />
+  <h3>In a client script</h3>
+  <p>
+    A frontmatter or template block can't use <code>{'${…}'}</code>: that code only runs on the
+    server, so nothing could set the value in the browser. A client script can.
+  </p>
+  <p id="visits"></p>
+  <h2><code>style</code>, for values that change constantly</h2>
+  <p>
+    The block is static and reads a custom property that <code>style</code> sets, so the class never
+    changes, no rules are added, and no runtime is needed. The server renders the real value too.
+  </p>
+  <StyleCounter client:load />
+</Layout>
+
+<script>
+  import { css } from '@pre.style/core';
+
+  // Astro bundles this script for the browser, so it can use runtime values.
+  document.getElementById('visits')!.className = css`
+    &::before {
+      content: 'Set in a script at ${new Date().getFullYear()}';
+    }
+  `;
+</script>

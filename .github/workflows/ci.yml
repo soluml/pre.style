@@ -23,3 +23,23 @@ jobs:
       - run: npm run demo:react-router:build
       - run: npm run demo:tanstack-start:build
       - run: npm run demo:astro:build
+      # After the builds: demos are checked against the packages' built types.
+      - run: npm run demo:typecheck
+
+  # The demos and generated CSS in real browser engines, since the runtime has
+  # to work in every Baseline browser.
+  browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build
+      - run: npm run demo:react-router:build
+      - run: npm run demo:tanstack-start:build
+      - run: npm run demo:astro:build
+      - run: npm run demo:e2e

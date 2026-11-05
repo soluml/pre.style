@@ -1,0 +1,94 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const conditional = `// Throws when open is false
+css\`width: \${open && width}px;\`;
+
+// Uses the default when open is false
+css\`width: var(\${open ? width : null}px, 120px);\`;`;
+
+const parsed = `// Throws when the prop isn't a number, because parseInt returns NaN
+css\`width: \${parseInt(size)}px;\`;
+
+// Uses the default instead
+const width = parseInt(size);
+css\`width: var(\${Number.isNaN(width) ? null : width}px, 120px);\`;`;
+
+const object = `// Throws: theme is an object
+css\`color: \${theme};\`;
+
+// Pass the value you want from it
+css\`color: \${theme.color};\`;`;
+---
+
+<Layout
+  title="Error 1: invalid runtime value | pre.style"
+  description="A runtime value in a pre.style block wasn't a string, a finite number, null, or undefined."
+>
+  <main>
+    <p><a href="/errors">Runtime errors</a></p>
+    <h1>Error 1: invalid runtime value</h1>
+    <p>
+      <code>{'pre.style error 1 (<type>): https://pre.style/errors/1'}</code>
+    </p>
+    <p>
+      A <code>{'${…}'}</code> in a <code>css</code> or <code>scss</code> block held a value pre.style
+      can't use. The message's <code>{'<type>'}</code> is the value's type, from
+      <code>typeof</code>.
+    </p>
+
+    <h2>What values can be</h2>
+    <ul>
+      <li>A string or a finite number, which sets the value.</li>
+      <li>
+        <code>null</code> or <code>undefined</code>, which adds no class, so the block's default
+        applies.
+      </li>
+    </ul>
+    <p>
+      Everything else throws: <code>true</code> and <code>false</code>, <code>NaN</code> and
+      <code>Infinity</code>, objects, arrays, functions, symbols, and bigints.
+    </p>
+
+    <h2>Why it throws</h2>
+    <p>
+      These values are almost always bugs. Using the default instead would hide the bug, and the
+      page would only look slightly wrong. It throws on the server and in the browser, so the two
+      always agree.
+    </p>
+
+    <h2>Common causes</h2>
+
+    <h3><code>boolean</code>: a condition with <code>&&</code></h3>
+    <p>
+      <code>{'open && width'}</code> is <code>false</code> when <code>open</code> is false. Use
+      <code>null</code> for "no value".
+    </p>
+    <pre><code>{conditional}</code></pre>
+
+    <h3><code>number</code>: <code>NaN</code> or <code>Infinity</code></h3>
+    <p>
+      Ordinary numbers are fine, so this type means the value wasn't finite. It usually comes from
+      parsing text that isn't a number, doing math on <code>undefined</code>, or dividing by zero.
+    </p>
+    <pre><code>{parsed}</code></pre>
+
+    <h3><code>object</code> or <code>function</code>: the wrong variable</h3>
+    <p>Check that the expression is the value itself, rather than what holds it.</p>
+    <pre><code>{object}</code></pre>
+
+    <h2>Finding the value</h2>
+    <p>
+      Run a development build. Its message says which value failed and shows the text around it,
+      and suggests a fix. The stack trace points to the component in either build.
+    </p>
+
+    <h2>Not this error</h2>
+    <p>
+      A string of the wrong kind, such as <code>"red"</code> for a width, doesn't throw, because
+      pre.style can't tell. The browser resets the declaration. To use the default instead, give the
+      value a type:
+      <code>{'var(${w}px type(<length>), 120px)'}</code>.
+    </p>
+  </main>
+</Layout>

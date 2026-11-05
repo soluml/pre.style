@@ -1,0 +1,22 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout
+  title="Runtime errors | pre.style"
+  description="What pre.style's production error numbers mean."
+>
+  <main>
+    <h1>Runtime errors</h1>
+    <p>
+      To keep the runtime small, production builds of pre.style throw a number instead of a full
+      message. Outside production builds, the same errors have full messages.
+    </p>
+    <ul>
+      <li>
+        <a href="/errors/1">Error 1</a>: a <code>{'${…}'}</code> value wasn't a string, a finite
+        number, <code>null</code>, or <code>undefined</code>.
+      </li>
+    </ul>
+  </main>
+</Layout>

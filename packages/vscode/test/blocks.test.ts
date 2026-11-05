@@ -55,6 +55,37 @@ describe('findBlockAt', () => {
   });
 });
 
+describe('blocks with `${…}`', () => {
+  test('a backtick in an expression does not close the block', () => {
+    assert.ok(at('css`width: ${`${a}px`}; col|`').block);
+    assert.ok(at('css`width: ${f(`a`)}; col|`').block);
+  });
+
+  test('braces, strings, and comments in an expression', () => {
+    assert.ok(at('css`width: ${{ a: 1 }.a}; col|`').block);
+    assert.ok(at("css`width: ${'}`'}; col|`").block);
+    assert.ok(at('css`width: ${a /* } */}; col|`').block);
+    assert.ok(at('css`width: ${a // }\n}; col|`').block);
+  });
+
+  test('records each expression', () => {
+    const { text, block } = at('css`a: ${b}c ${d}; |`');
+    assert.deepEqual(
+      block!.expressions.map(([start, end]) => text.slice(start, end)),
+      ['${b}', '${d}'],
+    );
+  });
+
+  test('a later block is still found', () => {
+    assert.ok(at('css`a: ${`b`};`; const x = 1; scss`|`').block);
+    assert.equal(at('css`a: ${`b`};`; const |x = 1;').block, undefined);
+  });
+
+  test('an unclosed expression runs to the end', () => {
+    assert.equal(at('css`a: ${b|').block?.contentEnd, 'css`a: ${b'.length);
+  });
+});
+
 describe('blockStylesheet', () => {
   test('keeps offsets and line breaks, and wraps the block in a rule', () => {
     const { text, block } = at('const a = 1;\nconst b = css`\n  color: |red;\n`;\nfoo();');
@@ -66,5 +97,12 @@ describe('blockStylesheet', () => {
   test('an unclosed block has no closing brace', () => {
     const { text, block } = at('scss`$a: |');
     assert.equal(blockStylesheet(text, block!), 'x   {$a: ');
+  });
+
+  test('expressions become an identifier, keeping offsets and line breaks', () => {
+    const { text, block } = at('css`width: ${w +\n1}px;|`');
+    const sheet = blockStylesheet(text, block!);
+    assert.equal(sheet.length, text.length);
+    assert.equal(sheet, 'x  {width: _____\n__px;}');
   });
 });

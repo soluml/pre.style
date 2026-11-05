@@ -18,6 +18,18 @@ export interface Rule {
   specificity: [number, number, number];
   order: number;
   sources: Source[];
+  // Inserted by the runtime for a value in a `${…}`, not in the CSS file.
+  generated?: boolean;
+}
+
+// A rule the runtime inserted, as the page reports it.
+export interface GeneratedRule {
+  className: string;
+  selector: string;
+  property: string;
+  value: string;
+  specificity: [number, number, number];
+  index: number;
 }
 
 export interface Usages {
@@ -41,7 +53,8 @@ export interface View {
   inactive: Rule[];
 }
 
-const PSEUDO_ELEMENT = /::[\w-]+(?:\([^)]*\))?/;
+// Includes the older `:before` form, which Lightning CSS writes.
+const PSEUDO_ELEMENT = /::[\w-]+(?:\([^)]*\))?|:(?:before|after|first-line|first-letter)\b/;
 const layered = (rule: Rule) => rule.atRules.some((atRule) => atRule.startsWith('@layer'));
 
 // Negative when `a` wins. Unlayered styles beat layered ones, and the other way
@@ -55,6 +68,39 @@ export function compareCascade(a: Rule, b: Rule): number {
     if (difference !== 0) return difference;
   }
   return b.order - a.order;
+}
+
+// The runtime's stylesheet comes after the CSS file, so its rules are later than
+// any the dev server numbers.
+const GENERATED_ORDER = 1_000_000_000;
+
+// Adds the runtime's rules to what the dev server reported. They aren't in any
+// file, so each takes its sources from the rules that read its variable.
+export function withGenerated(rules: Rule[], generated: GeneratedRule[]): Rule[] {
+  const added = generated.map(
+    ({ className, selector, property, value, specificity, index }): Rule => {
+      const reads = new RegExp(`var\\(\\s*${RegExp.escape(property)}(?![\\w-])`);
+      const places = new Map<string, Source>();
+      for (const rule of rules)
+        if (reads.test(rule.declaration) || rule.property === property)
+          for (const source of rule.sources)
+            places.set(`${source.file}:${source.line}:${source.column}`, source);
+      return {
+        className,
+        selector,
+        atRules: [],
+        declaration: `${property}: ${value}`,
+        property,
+        covers: [],
+        important: false,
+        specificity,
+        order: GENERATED_ORDER + index,
+        sources: [...places.values()],
+        generated: true,
+      };
+    },
+  );
+  return [...rules, ...added];
 }
 
 // Marks what's overridden among these rules. A shorthand overrides the longhands
@@ -112,7 +158,7 @@ export function buildView(rules: Rule[], matched: boolean[], own: string[], filt
       if (owned.has(rule.className)) inactive.push(rule);
       return;
     }
-    const name = PSEUDO_ELEMENT.exec(rule.selector)?.[0];
+    const name = PSEUDO_ELEMENT.exec(rule.selector)?.[0].replace(/^:(?!:)/, '::');
     if (name === undefined) normal.push(rule);
     else pseudo.set(name, [...(pseudo.get(name) ?? []), rule]);
   });

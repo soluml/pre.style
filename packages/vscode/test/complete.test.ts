@@ -58,4 +58,23 @@ describe('completeInBlock', () => {
     assert.equal(complete('const a = |1;'), undefined);
     assert.equal(complete('css`color: red`; const a = |1;'), undefined);
   });
+
+  test('after a `${…}`, in the same block', () => {
+    assert.ok(labels('css`width: ${w}px; col|`').includes('color'));
+    assert.ok(labels('css`width: ${`${w}px`}; col|`').includes('color'));
+    assert.ok(labels('css`&::before { content: ${c}; col| }`').includes('color'));
+  });
+
+  test('values next to a `${…}`', () => {
+    assert.ok(labels('css`margin: ${m}px; display: |`').includes('flex'));
+  });
+
+  test('nothing inside a `${…}`', () => {
+    assert.equal(complete('css`width: ${wi|dth}px;`'), undefined);
+    assert.equal(complete('css`width: ${|}px;`'), undefined);
+  });
+
+  test('scss blocks with `${…}`', () => {
+    assert.ok(labels('scss`$size: 1px; width: ${w}px; height: |`').includes('$size'));
+  });
 });

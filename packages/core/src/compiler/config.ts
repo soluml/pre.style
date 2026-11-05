@@ -24,6 +24,7 @@ export interface PackageConfig {
   // Give each `@keyframes` in the app's blocks and stylesheet files a
   // generated name, used only in its own block or file.
   keyframeLocalization?: boolean;
+  customPropertyLocalization?: boolean;
 }
 
 const KEYS = new Set([
@@ -33,6 +34,7 @@ const KEYS = new Set([
   'libraries',
   'quirksMode',
   'keyframeLocalization',
+  'customPropertyLocalization',
 ]);
 
 const isStrings = (value: unknown) =>
@@ -69,6 +71,11 @@ export function checkField(
     fail('quirksMode', '`true` or `false`');
   if (field.keyframeLocalization !== undefined && typeof field.keyframeLocalization !== 'boolean')
     fail('keyframeLocalization', '`true` or `false`');
+  if (
+    field.customPropertyLocalization !== undefined &&
+    typeof field.customPropertyLocalization !== 'boolean'
+  )
+    fail('customPropertyLocalization', '`true` or `false`');
   if (
     field.libraries !== undefined &&
     (field.libraries === null ||

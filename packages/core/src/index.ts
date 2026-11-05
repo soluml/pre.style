@@ -7,11 +7,14 @@ function notTransformed(): never {
   );
 }
 
-export function css(_strings: TemplateStringsArray): string {
+// What a `${…}` can hold. `null` and `undefined` use the block's default.
+export type RuntimeValue = string | number | null | undefined;
+
+export function css(_strings: TemplateStringsArray, ..._values: RuntimeValue[]): string {
   return notTransformed();
 }
 
-export function scss(_strings: TemplateStringsArray): string {
+export function scss(_strings: TemplateStringsArray, ..._values: RuntimeValue[]): string {
   return notTransformed();
 }
 
@@ -23,4 +26,4 @@ import { createCn } from './cn.ts';
 // are rewritten.
 export const cn = /* @__PURE__ */ createCn({});
 export { createCn };
-export type { ClassDictionary, ClassValue, CnTable } from './cn.ts';
+export type { ClassDictionary, ClassValue, CnLookup, CnTable } from './cn.ts';
