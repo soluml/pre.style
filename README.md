@@ -273,6 +273,8 @@ css`
 
 #### Custom properties
 
+Name a custom property to share a value: with other elements, which inherit it, with something else that reads that name, or across several declarations in a block. For a value that's only used on one element, write `${…}` directly instead. A name is global, so two blocks using the same one can affect each other. To avoid that, use distinctive names, or [`customPropertyLocalization`](#local-custom-properties).
+
 A custom property set directly on the element is set by name. It needs no generated variable or `@property`, only the generated class:
 
 ```js
@@ -393,6 +395,8 @@ cn(
 ```
 
 A block whose value is `null` or `undefined` adds no class, so it doesn't clear an earlier block's value of the same variable.
+
+Use `cn` to combine blocks that set the same declaration, rather than joining their class strings yourself. Blocks with the same declaration share a variable, so with `` `${a} ${b}` `` the value inserted last wins, whichever order the classes are in.
 
 #### Where values can go
 
