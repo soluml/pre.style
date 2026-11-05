@@ -1,0 +1,13 @@
+{
+  "name": "pre.style-demo-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "node --test --test-concurrency=1 \"*.test.ts\""
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}
