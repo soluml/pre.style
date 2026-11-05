@@ -55,18 +55,11 @@ function directSlot(atom: Atom): VarNode | null {
   return tokens.length === 1 && isSlot(token) && !token.value.fallback ? token : null;
 }
 
+const hash = (identity: unknown) =>
+  createHash('sha256').update(JSON.stringify(identity)).digest('base64url').slice(0, 16);
+
 const generatedKey = (atom: Atom, index: number) =>
-  createHash('sha256')
-    .update(
-      JSON.stringify([
-        atom.atRules.map((segment) => segment.key),
-        atom.variant?.key ?? '',
-        atom.property,
-        index,
-      ]),
-    )
-    .digest('base64url')
-    .slice(0, 16);
+  hash([atom.atRules.map((segment) => segment.key), atom.variant?.key ?? '', atom.property, index]);
 
 // `@property --a { syntax: "*"; inherits: false; }`. Without it, an element
 // with no value of its own takes its parent's instead of its default.
@@ -93,6 +86,34 @@ const registration = (name: string): GlobalRule => {
 const SLOT_MESSAGE =
   "`${…}` can only be used in a declaration's value, because it becomes a `var()`, which isn't valid here.";
 
+// Replaces the slots in a global rule, such as a `@keyframes`, with variables
+// identified by the rule and their place in it, so the same rule in any block
+// shares them.
+function globalVariables(
+  global: GlobalRule,
+  variables: Variable[],
+  added: Map<string, GlobalRule>,
+): GlobalRule {
+  const rule = structuredClone(global.rule);
+  const slots: VarNode[] = [];
+  eachSlot(rule, (node) => slots.push(node));
+  const numbers = slots.map(slotOf);
+  slots.forEach((node, index) => {
+    node.value.name.ident = `${SLOT_PREFIX}${index}`;
+  });
+  const identity = key(rule);
+  slots.forEach((node, index) => {
+    const variable = hash([identity, index]);
+    variables.push({ key: variable, property: null, slot: numbers[index] });
+    node.value.name.ident = VARIABLE_PREFIX + variable;
+    if (!added.has(variable)) added.set(variable, registration(VARIABLE_PREFIX + variable));
+  });
+  const json = key(rule);
+  // Anywhere else, such as a selector Sass built, it isn't a `var()` node.
+  if (json.includes(SLOT_PREFIX)) throw new PreStyleError(SLOT_MESSAGE, global.position);
+  return { ...global, key: json, rule };
+}
+
 // Turns a parsed block's placeholder variables into its real ones. Runs after
 // overridden atoms are dropped, so their slots are left out. Variables are
 // identified by what they're for, so `width: ${w}px` in any block shares one
@@ -101,18 +122,18 @@ export function extractVariables(
   atoms: Atom[],
   globals: GlobalRule[],
 ): { atoms: Atom[]; globals: GlobalRule[]; variables: Variable[] } {
-  // Sass can move a placeholder, so its positions are checked again here.
-  for (const global of globals)
-    if (global.key.includes(SLOT_PREFIX)) throw new PreStyleError(SLOT_MESSAGE, global.position);
-
   const variables: Variable[] = [];
   const added = new Map<string, GlobalRule>();
-  const kept: Atom[] = [];
+  const kept = globals.map((global) =>
+    global.key.includes(SLOT_PREFIX) ? globalVariables(global, variables, added) : global,
+  );
+  const keptAtoms: Atom[] = [];
   for (const atom of atoms) {
     const prefix = atom.atRules.map((segment) => segment.key).join() + (atom.variant?.key ?? '');
+    // Sass can move a placeholder, so its position is checked again here.
     if (prefix.includes(SLOT_PREFIX)) throw new PreStyleError(SLOT_MESSAGE, atom.position);
     if (!atom.declaration.key.includes(SLOT_PREFIX)) {
-      kept.push(atom);
+      keptAtoms.push(atom);
       continue;
     }
     const direct = directSlot(atom);
@@ -132,7 +153,7 @@ export function extractVariables(
       node.value.name.ident = VARIABLE_PREFIX + variable;
       if (!added.has(variable)) added.set(variable, registration(VARIABLE_PREFIX + variable));
     });
-    kept.push({
+    keptAtoms.push({
       ...atom,
       declaration: {
         ...atom.declaration,
@@ -141,5 +162,5 @@ export function extractVariables(
       },
     });
   }
-  return { atoms: kept, globals: [...globals, ...added.values()], variables };
+  return { atoms: keptAtoms, globals: [...kept, ...added.values()], variables };
 }

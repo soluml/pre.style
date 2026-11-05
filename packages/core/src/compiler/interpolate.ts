@@ -25,18 +25,20 @@ const EXPRESSION = '\0';
 const DELIMITER = /[\s,()/;:{}!"']/;
 const IDENT = /[\w-]/;
 
-// At-rules whose bodies are written to the output as they are, rather than
-// becoming atoms.
-const NON_ATOMIC =
-  /^@(-\w+-)?(keyframes|font-face|property|page|counter-style|font-feature-values|font-palette-values|view-transition|position-try)\b/i;
+// At-rules that can't read a runtime value: their descriptors don't accept
+// `var()`, or, for `@page`, have no element to read it from. Others, such as
+// `@keyframes`, `@position-try`, and `@function`, read it from the element
+// that uses them.
+const NO_VARIABLES =
+  /^@(font-face|property|page|counter-style|font-feature-values|font-palette-values|view-transition)\b/i;
 
 // Sass at-rules whose arguments are evaluated, rather than written out.
 const SASS_AT_RULES = /^@(include|return|if|else|each|for|while|debug|warn|error|function|mixin)\b/;
 
 const POSITION_MESSAGE =
   "`${…}` can only be used in a declaration's value, because it becomes a `var()`, which isn't valid in selectors, property names, or at-rule conditions. To share media queries, use Sass variables.";
-const NON_ATOMIC_MESSAGE =
-  "`${…}` can't be used here, because this at-rule is written to the CSS file as it is, so it can't read a runtime value.";
+const NO_VARIABLES_MESSAGE =
+  "`${…}` can't be used here: this at-rule doesn't accept `var()`, or has no element for the runtime to set it on.";
 const QUOTED_MESSAGE =
   '`${…}` can\'t be used inside a quoted string or `url()`, because it becomes a `var()`, which doesn\'t work there. Pass the whole value instead: `content: ${JSON.stringify(label)}`, or `--image: ${`url("${path}")`}` with `background-image: var(--image)`.';
 const FUNCTION_MESSAGE = "`${…}` can't be used as a function's name.";
@@ -118,7 +120,7 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
   const checkPosition = (start: number, end: number) => {
     const offset = text.indexOf(EXPRESSION, start);
     for (const { type, header } of open)
-      if (type === '{' && NON_ATOMIC.test(header.trim())) fail(NON_ATOMIC_MESSAGE, offset);
+      if (type === '{' && NO_VARIABLES.test(header.trim())) fail(NO_VARIABLES_MESSAGE, offset);
     const statement = text.slice(statementStart, start).trimStart();
     if (statement.startsWith('@')) {
       if (lang !== 'scss' || !SASS_AT_RULES.test(statement)) fail(POSITION_MESSAGE, offset);

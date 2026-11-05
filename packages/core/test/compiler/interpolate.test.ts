@@ -188,6 +188,60 @@ describe('custom properties', () => {
   });
 });
 
+describe('at-rules that read values from the element', () => {
+  test('`@keyframes`', async () => {
+    const { classes, variables, css } = await compile(
+      block`@keyframes grow { to { width: var(${'w'}px, 10px); } } animation: grow 1s;`,
+    );
+    assert.deepEqual(variables[0][0].slot, { strings: ['', 'px'], expressions: [0] });
+    assert.equal(variables[0][0].property, '--A');
+    assert.ok(classes[0].length > 0);
+    assert.match(css, /to\{width:var\(--A,10px\)\}/);
+    assert.match(css, /@property --A\{syntax:"\*";inherits:false\}/);
+  });
+
+  test('the same `@keyframes` in two blocks shares its variable', async () => {
+    const { variables, css } = await compile(
+      block`color: red; @keyframes a { to { width: ${'x'}px; } }`,
+      block`@keyframes a { to { width: ${'y'}em; } }`,
+    );
+    assert.equal(variables[0][0].name, variables[1][0].name);
+    assert.equal(css.match(/@keyframes/g)!.length, 1);
+  });
+
+  test('values in `@keyframes` and declarations count their slots in order', async () => {
+    const { variables } = await compile(
+      block`width: ${'a'}px; @keyframes k { to { height: ${'b'}px; } }`,
+    );
+    assert.deepEqual(variables[0].map((v) => v.slot.expressions).toSorted(), [[0], [1]]);
+  });
+
+  test('`@keyframes` with `keyframeLocalization`', async () => {
+    const compiler = await createCompiler({
+      keyframeLocalization: true,
+      lightningcss: { minify: true },
+    });
+    const b = interpolatedBlock(block`@keyframes k { to { width: ${'w'}px; } } animation-name: k;`);
+    compiler.scan(b);
+    compiler.assignNames();
+    assert.equal(compiler.variables(b).length, 1);
+    assert.doesNotMatch(compiler.css().code, /pre\.style|slot/);
+  });
+
+  test('`@position-try`', async () => {
+    const { variables, css } = await compile(block`@position-try --t { top: ${'y'}px; }`);
+    assert.equal(variables[0].length, 1);
+    assert.match(css, /@position-try --t\{top:var\(--A\)\}/);
+  });
+
+  test('`@function`', async () => {
+    const { variables, css } = await compile(block`@function --f() { result: ${'x'}px; }`);
+    assert.equal(variables[0].length, 1);
+    assert.match(css, /result:\s*var\(--A\)/);
+    assert.doesNotMatch(css, /slot/);
+  });
+});
+
 describe('scss', () => {
   test('values pass through Sass', async () => {
     const { variables, css } = await compile(
@@ -235,11 +289,16 @@ describe('errors', () => {
     rejects(block`@media (min-width: ${'bp'}px) { color: red; }`, POSITION);
     rejects(block`@supports (display: ${'d'}) { color: red; }`, POSITION);
   });
-  test('in at-rules written as they are', () => {
-    const message = /written to the CSS file as it is/;
-    rejects(block`@keyframes a { from { width: ${'w'}; } }`, message);
+  test("in at-rules that don't accept `var()`", () => {
+    const message = /doesn't accept `var\(\)`/;
     rejects(block`@property --a { syntax: "*"; inherits: ${'i'}; }`, message);
     rejects(block`@font-face { font-family: ${'f'}; }`, message);
+    rejects(block`@counter-style a { symbols: ${'s'}; }`, message);
+    rejects(block`@page { margin: ${'m'}; }`, message);
+    rejects(block`@view-transition { navigation: ${'n'}; }`, message);
+  });
+  test("in a `@keyframes` rule's selector", () => {
+    rejects(block`@keyframes a { ${'p'}% { width: 1px; } }`, POSITION);
   });
   test('in a quoted string or `url()`', () => {
     const message = /inside a quoted string or `url\(\)`.*JSON\.stringify/;
