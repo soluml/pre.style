@@ -499,6 +499,41 @@ By default, keyframes names are global, so two blocks that each define a differe
 - Names a block or file doesn't define are left as they are, so `animation-name: spin` still refers to a global `@keyframes spin`, for example one in a CSS file that pre.style doesn't process. That also means a block can't use keyframes another block defines.
 - Names in custom properties (`--anim: spin`) aren't renamed, because pre.style can't tell they name keyframes.
 
+#### Local custom properties
+
+By default, custom properties are global, so two blocks that each set `--gap` on nested elements affect each other. Set `"customPropertyLocalization": true` in your `package.json`'s `pre.style` field to give each custom property a generated name:
+
+```js
+const card = css`
+  --gap: 8px;
+  padding: var(--gap);
+`;
+```
+
+```css
+.A {
+  --B: 8px;
+}
+
+.C {
+  padding: var(--B);
+}
+```
+
+- A name a block or stylesheet file declares (with `--x: …` or `@property --x`) gets a generated name there, including in `var()`, `transition-property`, `will-change`, `@keyframes`, and `@container style()`. In a stylesheet file, every class in the file shares it.
+- Names it only reads are left as they are, so `color: var(--token)` still refers to a global `--token`.
+- Names from [prepended files](#sharing-values-with-prepended-files) are left as they are, even when a block sets them, so they're the way to share custom properties.
+- Other names that start with `--`, such as `anchor-name` and `@custom-media`, aren't custom properties, and aren't renamed.
+- [Runtime values](#custom-properties) follow: `--brand: ${color}` sets the generated name.
+
+> [!WARNING]
+> This changes what a block's CSS means, and failures are silent:
+>
+> - `style={{ "--gap": "16px" }}` no longer overrides a block's `--gap`, since the block's name has changed. Neither does `getPropertyValue("--gap")` find it.
+> - A child block can't read a `--gap` its parent block sets. Put a value that's shared between blocks in a prepended file.
+
+**It's for avoiding collisions, not for smaller output.** Blocks stop sharing classes for the same declaration, and in our tests that usually made the CSS larger: 50 blocks setting `--gap: 8px` grew by about 170%, gzipped. Long names used once are the exception: they shrink, by about 10% gzipped. Most projects don't need this.
+
 ### `composes` in blocks
 
 A block can build on classes from a [stylesheet file](#stylesheet-files), or on global class names, with `composes`, as in CSS Modules:
@@ -801,6 +836,7 @@ A library's class names depend on the whole app, so they differ between apps. Do
 | `exclude`              |                              | Globs removed from `include`.                                                                                                                                                                                                                     |
 | `prependFiles`         |                              | Files added to the start of the library's blocks and stylesheet files, relative to the package. They apply only to the library's, not the app's, so the library's tokens and mixins are always available to it and never leak into the app.       |
 | `keyframeLocalization` | `false`                      | Give each `@keyframes` in the library's blocks and stylesheet files a generated name. See [Local keyframes](#local-keyframes). The library's setting applies to its blocks, whatever the app sets, since the library's styles are written for it. |
+| `customPropertyLocalization` | `false`                      | Give each custom property declared in the library's blocks and stylesheet files a generated name, used only there. See [Local custom properties](#local-custom-properties). |
 
 `"pre.style": true` uses the defaults. A library's field uses the same name and shape as an app's (see [Configuration](#configuration)). `libraries` and `quirksMode` only apply to the app, so in a library's field they're ignored, with a warning. A package that is both, such as a library with its own demo app, is read as the app when it's the Vite root, and as a library when it's a dependency.
 
@@ -898,6 +934,7 @@ Options every tool that reads your styles has to agree on (the bundler plugin, a
 | `libraries`            |                                                   | Component libraries to compile, by package name, in addition to dependencies with a `pre.style` field. A config replaces the package's field, `true` uses the defaults, and `false` leaves the package out. See [Component libraries](#component-libraries). |
 | `quirksMode`           | `false`                                           | **You probably don't want this.** Use lowercase class names only, for pages in quirks mode. Names get longer. See [Quirks mode](#quirks-mode).                                                                                                               |
 | `keyframeLocalization` | `false`                                           | Give each `@keyframes` in the app's blocks and stylesheet files a generated name, used only in the block or file that defines it. See [Local keyframes](#local-keyframes). Libraries use their own setting.                                                  |
+| `customPropertyLocalization` | `false`                                           | Give each custom property declared in the app's blocks and stylesheet files a generated name, used only there. See [Local custom properties](#local-custom-properties). |
 
 The plugin warns about keys it doesn't know, and fails the build on values of the wrong type. For completion and validation in your editor, `@pre.style/core` includes a JSON Schema for the field, at `node_modules/@pre.style/core/package.schema.json`. In VS Code, add it to your settings:
 
