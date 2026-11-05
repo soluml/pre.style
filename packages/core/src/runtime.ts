@@ -88,10 +88,10 @@ export const create =
     return result;
   };
 
-// Production errors are numbered, to keep the runtime small. The README's
-// "Runtime errors" lists them, and `./runtime-dev.ts` has the full messages.
+// Production errors are numbered, to keep the runtime small. The site's
+// `/errors` pages explain them, and `./runtime-dev.ts` has the full messages.
 const invalidValue: InvalidValue = (value) => {
-  throw new TypeError(`pre.style error 1: ${typeof value}`);
+  throw new TypeError(`pre.style error 1 (${typeof value}): https://pre.style/errors/1`);
 };
 
 // What a block with `${…}` compiles to. It takes the block's class string and

@@ -949,11 +949,11 @@ The build fails, with the file, line, and column, when:
 
 ### Runtime errors
 
-[Runtime values](#runtime-values) are checked in the browser and on the server. Outside production builds, errors have full messages. To keep the runtime small, production builds only have a number and the type of the value:
+[Runtime values](#runtime-values) are checked in the browser and on the server. Outside production builds, errors have full messages. To keep the runtime small, production builds only have a number, the value's type, and a link to [a page that explains it](https://pre.style/errors):
 
 | Error | Meaning |
 | --- | --- |
-| `pre.style error 1: <type>` | A `${…}` value wasn't a string or a finite number, or `null` or `undefined` to use the default. `number` means it was `NaN` or `Infinity`. For a condition, write `${open ? width : null}` rather than `${open && width}`. |
+| [`pre.style error 1 (<type>)`](https://pre.style/errors/1) | A `${…}` value wasn't a string or a finite number, or `null` or `undefined` to use the default. `number` means it was `NaN` or `Infinity`. For a condition, write `${open ? width : null}` rather than `${open && width}`. |
 
 ## Known limitations
 

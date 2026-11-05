@@ -70,7 +70,7 @@ describe('on the server', () => {
     test(`${name} is an error`, () => {
       assert.throws(() => dynamic('A', ['A', ['', 'px'], [value]]), {
         name: 'TypeError',
-        message: `pre.style error 1: ${typeof value}`,
+        message: `pre.style error 1 (${typeof value}): https://pre.style/errors/1`,
       });
     });
 
