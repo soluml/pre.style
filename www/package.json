@@ -10,11 +10,11 @@
     "typecheck": "astro sync && tsc --runExternalCode"
   },
   "dependencies": {
-    "@pre.style/core": "3.1.0-alpha.2",
+    "@pre.style/core": "3.1.0-alpha.3",
     "astro": "^7.4.2"
   },
   "devDependencies": {
-    "@pre.style/vite": "3.1.0-alpha.5",
+    "@pre.style/vite": "3.1.0-alpha.6",
     "lightningcss": "^1.33.0",
     "sass": "^1.107.0",
     "typescript": "7.1.0-beta",
