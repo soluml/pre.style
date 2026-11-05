@@ -179,6 +179,86 @@ describe('runtime values', () => {
   });
 });
 
+describe('quoted strings', () => {
+  test('the whole string is the value, and its expressions are escaped', async () => {
+    const { classes, variables, css } = await compile(block`content: "Count: ${'i'}";`);
+    assert.deepEqual(classes, ['A']);
+    assert.deepEqual(variables[0][0].slot, { strings: ['"Count: ', '"'], expressions: [~0] });
+    assert.match(css, /\.A\{content:var\(--A\)\}/);
+  });
+
+  test('single quotes', async () => {
+    const { variables } = await compile(block`content: '${'i'}';`);
+    assert.deepEqual(variables[0][0].slot, { strings: ["'", "'"], expressions: [~0] });
+  });
+
+  test('with a default', async () => {
+    const { variables, css } = await compile(block`content: var("${'i'}", "0");`);
+    assert.deepEqual(variables[0][0].slot, { strings: ['"', '"'], expressions: [~0] });
+    assert.match(css, /content:var\(--A,"0"\)/);
+  });
+
+  test('with `type()`', async () => {
+    const { variables, css } = await compile(block`--l: var("${'i'}" type(<string>), "0");`);
+    assert.deepEqual(variables[0][0].slot.expressions, [~0]);
+    assert.match(css, /syntax:"<string>";inherits:false;initial-value:"0"/);
+  });
+
+  test('later expressions keep their own index', async () => {
+    const { variables } = await compile(block`width: ${'a'}px; content: "${'b'} ${'c'}";`);
+    const content = variables[0].find((v) => v.slot.expressions.length === 2)!;
+    assert.deepEqual(content.slot.expressions, [~1, ~2]);
+    assert.deepEqual(content.slot.strings, ['"', ' ', '"']);
+  });
+
+  test('a quote in the text is not the end of the string', async () => {
+    const { variables } = await compile(block`content: "a\"b ${'c'}";`);
+    assert.deepEqual(variables[0][0].slot.expressions, [~0]);
+  });
+
+  test('only values in the quotes are escaped', async () => {
+    const { variables } = await compile(block`--x: var(${'a'} "${'b'}", 1);`);
+    assert.deepEqual(variables[0][0].slot.expressions, [0, ~1]);
+  });
+
+  test('strings without expressions are unchanged', async () => {
+    const { css } = await compile(block`content: "a"; width: ${'w'}px;`);
+    assert.match(css, /content:"a"/);
+  });
+
+  test('`url()`', async () => {
+    const { variables, css } = await compile(block`background-image: url("${'path'}");`);
+    assert.deepEqual(variables[0][0].slot, { strings: ['url("', '")'], expressions: [~0] });
+    assert.match(css, /background-image:var\(--A\)/);
+  });
+
+  test('`url()` with text, and a default', async () => {
+    const { variables, css } = await compile(
+      block`background-image: var(url('/img/${'name'}.png'), none);`,
+    );
+    assert.deepEqual(variables[0][0].slot.strings, ["url('/img/", ".png')"]);
+    assert.match(css, /background-image:var\(--A,none\)/);
+  });
+
+  test('`url()` without expressions is unchanged', async () => {
+    const { css } = await compile(block`background-image: url("a.png"); width: ${'w'}px;`);
+    assert.match(css, /url\("?a\.png"?\)/);
+  });
+
+  test('on a pseudo-element', async () => {
+    const { variables } = await compile(block`&::before { content: "${'i'}"; }`);
+    assert.deepEqual(variables[0][0].selector, ['', ':before']);
+  });
+
+  test('in scss', async () => {
+    const { variables } = await compile({
+      ...block`$d: 1px; margin-top: $d; content: "${'i'}";`,
+      lang: 'scss',
+    });
+    assert.deepEqual(variables[0][0].slot.expressions, [~0]);
+  });
+});
+
 describe('custom properties', () => {
   test('a custom property set to a value sets it directly', async () => {
     const { classes, variables, css } = await compile(
@@ -336,6 +416,17 @@ describe('`type()`', () => {
     await compile(block`width: var(${'w'} type(<length-percentage>), calc(10% + 1px));`);
   });
 
+  describe('Sass interpolation elsewhere', () => {
+    test('`#{…}` before a value, in another token', async () => {
+      const { variables, css } = await compile({
+        ...block`$a: 1px; margin: #{$a} ${'v'}px;`,
+        lang: 'scss',
+      });
+      assert.equal(variables[0].length, 1);
+      assert.match(css, /margin:1px var\(--A\)/);
+    });
+  });
+
   describe('errors', () => {
     test('no default', () => {
       rejects(block`width: var(${'w'} type(<length>));`, /`type\(\)` needs a default/);
@@ -489,13 +580,19 @@ describe('errors', () => {
   test("in a `@keyframes` rule's selector", () => {
     rejects(block`@keyframes a { ${'p'}% { width: 1px; } }`, POSITION);
   });
-  test('in a quoted string or `url()`', () => {
-    const message = /inside a quoted string or `url\(\)`.*JSON\.stringify/;
-    rejects(block`content: "${'label'}";`, message);
-    rejects(block`content: 'a${'label'}';`, message);
-    rejects(block`background-image: url(${'path'});`, message);
-    rejects(block`background-image: url("${'path'}");`, message);
-    rejects(block`width: var("${'a'}", 1px);`, message);
+  test('in an unquoted `url()`', () => {
+    rejects(block`background-image: url(${'path'});`, /unquoted `url\(\)`.*url\("\$\{path\}"\)/);
+  });
+  test('a quoted string in a selector or condition', () => {
+    rejects(block`&[data-a="${'v'}"] { color: red; }`, POSITION);
+    rejects(block`@supports (content: "${'v'}") { color: red; }`, POSITION);
+    rejects(block`@font-face { font-family: "${'f'}"; }`, /doesn't accept `var\(\)`/);
+  });
+  test('`#{…}` in the same value in scss', () => {
+    const lang = 'scss' as Lang;
+    rejects({ ...block`content: "#{$a} ${'v'}";`, lang }, /`#\{…\}` can't be used/);
+    rejects({ ...block`width: #{$a}${'v'};`, lang }, /`#\{…\}` can't be used/);
+    rejects({ ...block`width: ${'v'}#{$a};`, lang }, /`#\{…\}` can't be used/);
   });
   test("as a function's name", () => {
     rejects(block`width: ${'fn'}(1px);`, /function's name/);

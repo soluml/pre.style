@@ -2,7 +2,8 @@ import { PreStyleError } from './block.ts';
 import type { Lang, Position } from './block.ts';
 
 // An interpolation's text: `${w}px` is `strings: ['', 'px']` and
-// `expressions: [0]`, where each expression is an index into the block's.
+// `expressions: [0]`, where each expression is an index into the block's. In a
+// quoted string, it's written as `~index`, since the runtime has to escape it.
 export interface Slot {
   strings: string[];
   expressions: number[];
@@ -39,8 +40,10 @@ const POSITION_MESSAGE =
   "`${…}` can only be used in a declaration's value, because it becomes a `var()`, which isn't valid in selectors, property names, or at-rule conditions. To share media queries, use Sass variables.";
 const NO_VARIABLES_MESSAGE =
   "`${…}` can't be used here: this at-rule doesn't accept `var()`, or has no element for the runtime to set it on.";
-const QUOTED_MESSAGE =
-  '`${…}` can\'t be used inside a quoted string or `url()`, because it becomes a `var()`, which doesn\'t work there. Pass the whole value instead: `content: ${JSON.stringify(label)}`, or `--image: ${`url("${path}")`}` with `background-image: var(--image)`.';
+const UNQUOTED_URL_MESSAGE =
+  '`${…}` can\'t be used in an unquoted `url()`. Add quotes: `url("${path}")`.';
+const SASS_MESSAGE =
+  "`#{…}` can't be used in the same value as `${…}`, because that value is set at runtime, after Sass has run. Use a Sass variable in a separate declaration.";
 const TYPE_RUNTIME_MESSAGE =
   "`type()` and its default are written to the CSS file, so they can't use `${…}`.";
 const TYPE_DEFAULT_MESSAGE =
@@ -79,12 +82,24 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
   // Adds a slot for the text at [start, end), and returns its placeholder's
   // name, and the newlines to write after it, so later lines stay in place.
   const addSlot = (start: number, end: number) => {
+    const span = text.slice(start, end);
+    if (lang === 'scss' && span.includes('#{')) fail(SASS_MESSAGE, start);
     const first = expressionIndex(start);
-    const parts = text.slice(start, end).split(EXPRESSION);
-    const used = Array.from({ length: parts.length - 1 }, (_, i) => first + i);
+    const parts = span.split(EXPRESSION);
+    const used: number[] = [];
+    let quote: string | null = null;
+    for (let i = 0; i < span.length; i++) {
+      const ch = span[i];
+      if (ch === '\\') i++;
+      else if (ch === EXPRESSION) {
+        const index = first + used.length;
+        used.push(quote === null ? index : ~index);
+      } else if (quote === null ? ch === '"' || ch === "'" : ch === quote)
+        quote = quote === null ? ch : null;
+    }
     const index = slots.push({ strings: parts, expressions: used }) - 1;
     const lines =
-      newlines(text.slice(start, end)) + used.reduce((n, e) => n + newlines(expressions[e]), 0);
+      newlines(span) + used.reduce((n, e) => n + newlines(expressions[e < 0 ? ~e : e]), 0);
     return { name: `${SLOT_PREFIX}${index}`, lines: '\n'.repeat(lines) };
   };
 
@@ -93,14 +108,14 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
   const open: { type: '(' | '#{' | '{'; header: string }[] = [];
   const atStatementLevel = () => open.length === 0 || open.at(-1)!.type === '{';
   let statementStart = 0;
+  // Where the last `#{…}` ended, since it can't touch a slot.
+  let sassEnd = -1;
 
-  // The end of the string starting at `start`, an error if it has an
-  // expression in it.
+  // The end of the string starting at `start`.
   const stringEnd = (start: number) => {
     let i = start + 1;
     for (; i < text.length && text[i] !== text[start]; i++) {
       if (text[i] === '\\') i++;
-      else if (text[i] === EXPRESSION) fail(QUOTED_MESSAGE, i);
     }
     return i + 1;
   };
@@ -195,7 +210,14 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
 
     if (ch === '"' || ch === "'") {
       const end = stringEnd(i);
-      code += text.slice(i, end);
+      const string = text.slice(i, end);
+      // `"Count: ${i}"`: the whole string is the value, since a `var()` can't
+      // go inside one.
+      if (string.includes(EXPRESSION)) {
+        checkPosition(i, end);
+        const slot = addSlot(i, end);
+        code += `var(${slot.name})${slot.lines}`;
+      } else code += string;
       i = end;
       tokenStart = i;
       tokenCode = code.length;
@@ -204,17 +226,24 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
 
     const standsAlone = i === 0 || !IDENT.test(text[i - 1]);
 
-    // An unquoted `url()` is one token, which can't hold a `var()`.
+    // A `url()` can't hold a `var()`, so it's a value as a whole.
     if (standsAlone && text.slice(i, i + 4).toLowerCase() === 'url(') {
       const argument = /\s*/y;
       argument.lastIndex = i + 4;
-      const first = text[i + 4 + argument.exec(text)![0].length];
-      if (first !== '"' && first !== "'") {
-        const close = text.indexOf(')', i);
-        const end = close === -1 ? text.length : close + 1;
-        const inside = text.indexOf(EXPRESSION, i);
-        if (inside !== -1 && inside < end) fail(QUOTED_MESSAGE, inside);
-        code += text.slice(i, end);
+      const firstAt = i + 4 + argument.exec(text)![0].length;
+      const first = text[firstAt];
+      const quoted = first === '"' || first === "'";
+      const close = text.indexOf(')', quoted ? stringEnd(firstAt) : i);
+      const end = close === -1 ? text.length : close + 1;
+      const inside = text.slice(i, end).indexOf(EXPRESSION);
+      if (inside !== -1 && !quoted) fail(UNQUOTED_URL_MESSAGE, i + inside);
+      if (inside !== -1 || !quoted) {
+        // `url("${path}")`: the whole `url()` is the value.
+        if (inside !== -1) {
+          checkPosition(i, end);
+          const slot = addSlot(i, end);
+          code += `var(${slot.name})${slot.lines}`;
+        } else code += text.slice(i, end);
         i = end;
         tokenStart = i;
         tokenCode = code.length;
@@ -258,6 +287,8 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
       let end = i;
       while (end < text.length && !DELIMITER.test(text[end])) end++;
       if (text[end] === '(') fail(FUNCTION_MESSAGE, i);
+      if (tokenStart === sassEnd || (text[end - 1] === '#' && text[end] === '{'))
+        fail(SASS_MESSAGE, i);
       checkPosition(tokenStart, end);
       const slot = addSlot(tokenStart, end);
       code = `${code.slice(0, tokenCode)}var(${slot.name})${slot.lines}`;
@@ -283,8 +314,9 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
         statementStart = i + 1;
       }
     } else if (ch === '}') {
-      if (open.length > 0) open.pop();
-      if (atStatementLevel()) statementStart = i + 1;
+      // Sass's `#{…}` is part of a value, so it doesn't end a statement.
+      if (open.pop()?.type === '#{') sassEnd = i + 1;
+      else if (atStatementLevel()) statementStart = i + 1;
     } else if (ch === ';' && atStatementLevel()) statementStart = i + 1;
 
     code += ch;

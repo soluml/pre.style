@@ -1,7 +1,8 @@
 import type { CnLookup } from './cn.ts';
 
 // What the bundler plugin passes for each variable a block sets: its short
-// name, the text around its values, which of the block's values they are, and
+// name, the text around its values, which of the block's values they are (as
+// `~index` for a value in a quoted string, which has to be escaped), and
 // the custom property it sets, when that isn't `--<name>`, and where to set it,
 // split where the class goes, when that isn't the element.
 export type RuntimeVariable = [
@@ -35,6 +36,9 @@ function hash(value: string, alphabet: string): string {
   return result;
 }
 
+// What can't be written as it is in a quoted CSS string.
+const UNSAFE_IN_STRING = /["'\\\n\r\f]/g;
+
 // Reports a value that isn't a string, a finite number, null, or undefined.
 export type InvalidValue = (value: unknown, strings: readonly string[]) => never;
 
@@ -50,10 +54,14 @@ function text(
   let result = strings[0];
   let missing = false;
   for (let i = 0; i < indexes.length; i++) {
-    const value = values[indexes[i]];
+    const index = indexes[i];
+    const value = values[index < 0 ? ~index : index];
     if (value === null || value === undefined) missing = true;
     else if (typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)))
-      result += value + strings[i + 1];
+      result +=
+        (index < 0
+          ? String(value).replace(UNSAFE_IN_STRING, (c) => `\\${c.charCodeAt(0).toString(16)} `)
+          : value) + strings[i + 1];
     else invalid(value, strings);
   }
   return missing ? null : result;

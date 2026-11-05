@@ -246,14 +246,10 @@ css`
 }
 ```
 
-Values work in nested selectors too, including pseudo-elements and other elements. The generated class's rule uses the same selector, so the value reaches them. `content` needs a string, so pass one:
+Values work in nested selectors too, including pseudo-elements and other elements. The generated class's rule uses the same selector, so the value reaches them:
 
 ```js
 css`
-  &::before {
-    content: var(${JSON.stringify(String(count))}, "0");
-  }
-
   & > * {
     margin-top: ${gap}px;
   }
@@ -266,10 +262,37 @@ css`
 
 ```css
 /* Inserted by the runtime */
-._A3fK9::before {
-  --A: "5";
+._A3fK9 > * {
+  --A: 8px;
 }
 ```
+
+#### Strings and URLs
+
+Write quotes around `${…}` for a string, with any text you like. The runtime escapes the value, and numbers work too. `url()` needs its quotes:
+
+```js
+css`
+  background-image: url("/img/${name}.png");
+
+  &::before {
+    content: var("Count: ${count}", "Loading");
+  }
+`;
+```
+
+```css
+/* Inserted by the runtime */
+._A3fK9 {
+  --A: url("/img/photo.png");
+}
+
+._B7xQ2::before {
+  --B: "Count: 5";
+}
+```
+
+The whole string is the value, so a default goes around it, as above. `content: ${x}` without quotes doesn't add any: use it for values that are already CSS, such as `none` or `counter(n)`. In `scss` blocks, `#{…}` can't be in the same value as `${…}`.
 
 #### Custom properties
 
@@ -408,18 +431,7 @@ css`
   margin-${side}: 0;                       /* property names */
   @media (min-width: ${bp}px) { top: 0; }  /* at-rule conditions, see Sharing media queries */
   @font-face { font-weight: ${weight}; }   /* @font-face, @property, @page, and similar */
-  content: "${label}";                     /* quoted strings */
-  background-image: url(${path});          /* url() */
-`;
-```
-
-For strings and URLs, pass the whole value:
-
-```js
-css`
-  content: ${JSON.stringify(label)};
-  --image: ${`url("${path}")`};
-  background-image: var(--image);
+  background-image: url(${path});          /* url() without quotes */
 `;
 ```
 
@@ -448,15 +460,29 @@ In older browsers:
 
 #### When to use `style` instead
 
-Every new value adds a rule that's never removed. That suits values with a limited set of results, such as a theme color or a chosen size. For values that change constantly, such as a drag position or anything set per frame, use the `style` attribute and read it from the block:
+A block compiles to a class string, so the runtime can't tell which element it's for. That's why each distinct value gets its own class, rather than one class whose value changes: two elements from the same block can have different values, as in a list. So the class changes with the value, and every new value adds a rule that's never removed.
+
+That suits values from a small set, such as a theme color or a chosen size, where going back to a value reuses its class. For values that change constantly, such as a counter, a drag position, or anything set per frame, use the `style` attribute and read it from a static block. The class never changes, no rules are added, the server renders the real value, and no runtime is needed:
 
 ```jsx
 const box = css`
-  transform: translateX(var(--x));
+  transform: translateX(var(--x, 0));
 `;
 
 <div className={box} style={{ "--x": `${x}px` }} />;
 ```
+
+| | `${…}` | `style` |
+| --- | --- | --- |
+| The class | Changes with the value | Stays the same |
+| CSS rules | One per distinct value, kept | None added |
+| On the server | The default, until the runtime runs | The real value |
+| In `cn` | Later values win | Not involved |
+| Runtime | Needed | Not needed |
+| In pseudo-elements and other elements | Reaches them | Only if the property inherits |
+| Best for | Values from a small set | Values that change constantly |
+
+The demos' Interpolation pages show both side by side.
 
 ### Selectors
 

@@ -136,6 +136,14 @@ describe('on the server', () => {
     assert.equal(result.split(' ')[2], dynamic('', ['C', ['', ''], ['y']]));
   });
 
+  test('a quoted value is escaped', () => {
+    const run = (value: unknown) => runtime.dynamic('', [value], ['Q', ['"', '"'], [~0]]);
+    // The same text escaped and not gets a different class.
+    assert.notEqual(run('a"b'), runtime.dynamic('', ['a"b'], ['Q', ['"', '"'], [0]]));
+    assert.match(run(5), /^_Q/);
+    assert.equal(run(null), '');
+  });
+
   test('zero and empty strings are values', () => {
     assert.match(dynamic('', ['A', ['', ''], [0]]), shape);
     assert.match(dynamic('', ['A', ['', ''], ['']]), shape);
@@ -243,6 +251,21 @@ describe('in the browser', () => {
       assert.match(result, /^A _A/);
     } finally {
       Object.assign(globalThis, { CSSStyleSheet: constructor });
+    }
+  });
+
+  test('quoted values are written safely', () => {
+    for (const [value, expected] of [
+      [5, '"5"'],
+      ['plain', '"plain"'],
+      ['say "hi"', '"say \\22 hi\\22 "'],
+      ["it's", '"it\\27 s"'],
+      ['back\\slash', '"back\\5c slash"'],
+      ['line\nbreak', '"line\\a break"'],
+    ] as const) {
+      const className = runtime.dynamic('', [value], ['Q', ['"', '"'], [~0]]);
+      const rule = rules().find((r) => r.selector === `.${className}`)!;
+      assert.deepEqual([...rule.properties], [['--Q', expected]]);
     }
   });
 
