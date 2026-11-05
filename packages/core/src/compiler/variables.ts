@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { transform } from 'lightningcss';
 import type { Declaration, Rule } from 'lightningcss';
-import { key, PreStyleError } from './block.ts';
-import type { Atom, GlobalRule } from './block.ts';
+import { key, overrideKey, PreStyleError, valueOf } from './block.ts';
+import type { Atom, GlobalRule, Position } from './block.ts';
 import { atRuleInfo } from './at-rules.ts';
 import { SLOT_PREFIX } from './interpolate.ts';
+import { print } from './print.ts';
 
 // A variable a block's runtime values set. In parsed rules, a generated
 // variable's name is this prefix and a hash of what it's for, and the compiler
@@ -27,7 +29,17 @@ const isSlot = (node: unknown): node is VarNode => {
   return value?.type === 'var' && value.value.name.ident.startsWith(SLOT_PREFIX);
 };
 
-const slotOf = (node: VarNode) => Number(node.value.name.ident.slice(SLOT_PREFIX.length));
+// A placeholder's slot, and its type from `type()`, which is in its name (in
+// hex) so that blocks differing only by type don't share a parse.
+const parseSlot = (node: VarNode) => {
+  const [, slot, type] = /^(\d+)(?:-t([\da-f]+))?/.exec(
+    node.value.name.ident.slice(SLOT_PREFIX.length),
+  )!;
+  return {
+    slot: Number(slot),
+    syntax: type === undefined ? null : Buffer.from(type, 'hex').toString(),
+  };
+};
 
 // Calls `visit` for each slot in a value, in the order they're written.
 function eachSlot(value: unknown, visit: (node: VarNode) => void) {
@@ -49,17 +61,24 @@ const IGNORED = (token: { type: string; value?: { type?: string } }) =>
 function directSlot(atom: Atom): VarNode | null {
   if (atom.atRules.length > 0 || atom.variant !== null || atom.declaration.important) return null;
   const declaration = atom.declaration.value as Declaration;
-  if (declaration.property !== 'custom') return null;
+  // Lightning CSS also uses `custom` for properties it doesn't parse, such as
+  // `content` with a `var()`.
+  if (declaration.property !== 'custom' || !atom.property.startsWith('--')) return null;
   const tokens = (declaration.value.value as { type: string }[]).filter((t) => !IGNORED(t));
   const [token] = tokens;
-  return tokens.length === 1 && isSlot(token) && !token.value.fallback ? token : null;
+  if (tokens.length !== 1 || !isSlot(token)) return null;
+  return !token.value.fallback || parseSlot(token).syntax !== null ? token : null;
 }
 
 const hash = (identity: unknown) =>
   createHash('sha256').update(JSON.stringify(identity)).digest('base64url').slice(0, 16);
 
-const generatedKey = (atom: Atom, index: number) =>
-  hash([atom.atRules.map((segment) => segment.key), atom.variant?.key ?? '', atom.property, index]);
+const atomIdentity = (atom: Atom, index: number) => [
+  atom.atRules.map((segment) => segment.key),
+  atom.variant?.key ?? '',
+  atom.property,
+  index,
+];
 
 // `@property --a { syntax: "*"; inherits: false; }`. Without it, an element
 // with no value of its own takes its parent's instead of its default.
@@ -83,8 +102,102 @@ const registration = (name: string): GlobalRule => {
   };
 };
 
+// Units and functions that depend on where they're used. Browsers drop a
+// typed `@property` whose `initial-value` has them (tested in Chromium), and
+// Lightning CSS doesn't report them.
+const NOT_INDEPENDENT =
+  /(?<![\w-])[+-]?[\d.]+(?:e[+-]?\d+)?(?:em|rem|ex|rex|ch|rch|lh|rlh|cap|rcap|ic|ric|cqw|cqh|cqi|cqb|cqmin|cqmax)\b|\b(?:env|attr)\(/i;
+const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+
+// A slot's default, as CSS.
+function defaultText(node: VarNode): string {
+  const rule = {
+    type: 'style',
+    value: {
+      selectors: [[{ type: 'class', name: 'z' }]],
+      declarations: {
+        declarations: [
+          { property: 'custom', value: { name: '--z', value: node.value.fallback ?? [] } },
+        ],
+      },
+      rules: [],
+      loc: { source_index: 0, line: 0, column: 1 },
+    },
+  } as unknown as Rule;
+  const { code } = print([rule], [], {}, false);
+  return /--z:\s*(.*?);?\s*\}/s.exec(code)![1];
+}
+
+// `@property --a { syntax: "<length>"; inherits: false; initial-value: 1px; }`.
+function typedRegistration(
+  name: string,
+  syntax: string,
+  initial: string,
+  position: Position | null,
+): GlobalRule {
+  const invalid = (reason: string, cause?: unknown) =>
+    new PreStyleError(
+      `\`${initial}\` can't be the default of \`type(${syntax})\`: ${reason}`,
+      position,
+      { cause },
+    );
+  if (NOT_INDEPENDENT.test(initial.replace(QUOTED, '')))
+    throw invalid(
+      "a typed variable's default can't depend on where it's used, such as `em`, `rem`, container units, `env()`, or `attr()`, or browsers drop its `@property` rule. Use an absolute value, or leave out `type()`.",
+    );
+  let parsed: Rule | undefined;
+  try {
+    transform({
+      filename: 'type.css',
+      code: Buffer.from(
+        `@property --z{syntax:${JSON.stringify(syntax)};inherits:false;initial-value:${initial}}`,
+      ),
+      visitor: {
+        StyleSheetExit(sheet) {
+          [parsed] = sheet.rules;
+        },
+      },
+    });
+  } catch (error) {
+    throw invalid(`it isn't valid for that type (${(error as Error).message}).`, error);
+  }
+  const rule = { ...parsed!, value: { ...valueOf(parsed!), name } } as Rule;
+  return {
+    key: key(rule),
+    rule,
+    hoist: atRuleInfo('property').hoist,
+    overrideKey: null,
+    position,
+  };
+}
+
 const SLOT_MESSAGE =
   "`${…}` can only be used in a declaration's value, because it becomes a `var()`, which isn't valid here.";
+
+// Points a slot at its variable, and registers the variable. A typed
+// variable's default moves to its `initial-value`, so each type and default
+// has its own variable.
+function useVariable(
+  node: VarNode,
+  identity: unknown,
+  slot: number,
+  syntax: string | null,
+  variables: Variable[],
+  added: Map<string, GlobalRule>,
+  position: Position | null,
+) {
+  const initial = syntax === null ? null : defaultText(node);
+  const variable = hash([identity, syntax, initial]);
+  const name = VARIABLE_PREFIX + variable;
+  variables.push({ key: variable, property: null, slot });
+  node.value.name.ident = name;
+  if (syntax !== null) node.value.fallback = null;
+  if (added.has(variable)) return;
+  added.set(
+    variable,
+    syntax === null ? registration(name) : typedRegistration(name, syntax, initial!, position),
+  );
+}
 
 // Replaces the slots in a global rule, such as a `@keyframes`, with variables
 // identified by the rule and their place in it, so the same rule in any block
@@ -97,16 +210,15 @@ function globalVariables(
   const rule = structuredClone(global.rule);
   const slots: VarNode[] = [];
   eachSlot(rule, (node) => slots.push(node));
-  const numbers = slots.map(slotOf);
+  const parsed = slots.map(parseSlot);
   slots.forEach((node, index) => {
-    node.value.name.ident = `${SLOT_PREFIX}${index}`;
+    const type = parsed[index].syntax === null ? '' : `:${parsed[index].syntax}`;
+    node.value.name.ident = `${SLOT_PREFIX}${index}${type}`;
   });
   const identity = key(rule);
   slots.forEach((node, index) => {
-    const variable = hash([identity, index]);
-    variables.push({ key: variable, property: null, slot: numbers[index] });
-    node.value.name.ident = VARIABLE_PREFIX + variable;
-    if (!added.has(variable)) added.set(variable, registration(VARIABLE_PREFIX + variable));
+    const { slot, syntax } = parsed[index];
+    useVariable(node, [identity, index], slot, syntax, variables, added, global.position);
   });
   const json = key(rule);
   // Anywhere else, such as a selector Sass built, it isn't a `var()` node.
@@ -138,20 +250,29 @@ export function extractVariables(
     }
     const direct = directSlot(atom);
     if (direct !== null) {
-      variables.push({
-        key: `direct:${atom.property}`,
-        property: atom.property,
-        slot: slotOf(direct),
-      });
+      const { slot, syntax } = parseSlot(direct);
+      variables.push({ key: `direct:${atom.property}`, property: atom.property, slot });
+      // A typed custom property registers itself, under its own name.
+      if (syntax !== null) {
+        const registered = typedRegistration(
+          atom.property,
+          syntax,
+          defaultText(direct),
+          atom.position,
+        );
+        added.set(`direct:${atom.property}:${registered.key}`, {
+          ...registered,
+          overrideKey: overrideKey(registered.rule),
+        });
+      }
       continue;
     }
     const value = structuredClone(atom.declaration.value);
     let index = 0;
     eachSlot(value, (node) => {
-      const variable = generatedKey(atom, index++);
-      variables.push({ key: variable, property: null, slot: slotOf(node) });
-      node.value.name.ident = VARIABLE_PREFIX + variable;
-      if (!added.has(variable)) added.set(variable, registration(VARIABLE_PREFIX + variable));
+      const { slot, syntax } = parseSlot(node);
+      const identity = atomIdentity(atom, index++);
+      useVariable(node, identity, slot, syntax, variables, added, atom.position);
     });
     keptAtoms.push({
       ...atom,

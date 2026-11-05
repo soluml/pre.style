@@ -41,7 +41,14 @@ const NO_VARIABLES_MESSAGE =
   "`${…}` can't be used here: this at-rule doesn't accept `var()`, or has no element for the runtime to set it on.";
 const QUOTED_MESSAGE =
   '`${…}` can\'t be used inside a quoted string or `url()`, because it becomes a `var()`, which doesn\'t work there. Pass the whole value instead: `content: ${JSON.stringify(label)}`, or `--image: ${`url("${path}")`}` with `background-image: var(--image)`.';
+const TYPE_RUNTIME_MESSAGE =
+  "`type()` and its default are written to the CSS file, so they can't use `${…}`.";
+const TYPE_DEFAULT_MESSAGE =
+  '`type()` needs a default, because a typed `@property` requires an `initial-value`: `var(${w}px type(<length>), 120px)`.';
 const FUNCTION_MESSAGE = "`${…}` can't be used as a function's name.";
+
+// The optional type at the end of `var()`'s first argument, as in `attr()`.
+const TYPE = /\s+type\(\s*(.*?)\s*\)\s*$/s;
 
 const newlines = (text: string) => text.split('\n').length - 1;
 
@@ -144,6 +151,13 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
     return text.length;
   };
 
+  // The parenthesis that closes the `var()` whose fallback starts at `start`.
+  const closingParenthesis = (start: number) => {
+    let end = firstArgumentEnd(start);
+    while (text[end] === ',') end = firstArgumentEnd(end + 1);
+    return end;
+  };
+
   let code = '';
   // Where the current token starts, in `text` and in `code`.
   let tokenStart = 0;
@@ -213,12 +227,25 @@ export function interpolate(strings: string[], expressions: string[], lang: Lang
     if (standsAlone && text.slice(i, i + 4).toLowerCase() === 'var(') {
       const end = firstArgumentEnd(i + 4);
       const raw = text.slice(i + 4, end);
-      if (raw.includes(EXPRESSION)) {
-        const start = i + 4 + (raw.length - raw.trimStart().length);
-        const trimmedEnd = i + 4 + raw.trimEnd().length;
+      const typed = TYPE.exec(raw);
+      if (typed?.[1].includes(EXPRESSION)) fail(TYPE_RUNTIME_MESSAGE, text.indexOf(EXPRESSION, i));
+      const argument = typed === null ? raw : raw.slice(0, typed.index);
+      if (argument.includes(EXPRESSION)) {
+        const start = i + 4 + (argument.length - argument.trimStart().length);
+        const trimmedEnd = i + 4 + argument.trimEnd().length;
         checkPosition(start, end);
+        // `type(*)` is the same as no type.
+        const syntax = typed === null || typed[1] === '*' ? null : typed[1];
+        if (syntax !== null) {
+          if (text[end] !== ',') fail(TYPE_DEFAULT_MESSAGE, start);
+          const close = closingParenthesis(end + 1);
+          const inDefault = text.slice(end, close).indexOf(EXPRESSION);
+          if (inDefault !== -1) fail(TYPE_RUNTIME_MESSAGE, end + inDefault);
+        }
         const slot = addSlot(start, trimmedEnd);
-        code += `var(${slot.name}${slot.lines}`;
+        const type = syntax === null ? '' : `-t${Buffer.from(syntax).toString('hex')}`;
+        const skipped = '\n'.repeat(newlines(text.slice(trimmedEnd, end)));
+        code += `var(${slot.name}${type}${slot.lines}${skipped}`;
         open.push({ type: '(', header: '' });
         i = end;
         tokenStart = i;

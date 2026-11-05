@@ -164,6 +164,13 @@ describe('custom properties', () => {
     );
   });
 
+  test('a property Lightning CSS leaves unparsed still makes an atom', async () => {
+    const { classes, variables, css } = await compile(block`content: ${'label'};`);
+    assert.deepEqual(classes, ['A']);
+    assert.equal(variables[0][0].property, '--A');
+    assert.match(css, /\.A\{content:var\(--A\)\}/);
+  });
+
   test('a default goes through a variable', async () => {
     const { variables, css } = await compile(block`--brand: var(${'c'}, #f00);`);
     assert.equal(variables[0][0].property, '--A');
@@ -185,6 +192,152 @@ describe('custom properties', () => {
     const { variables, css } = await compile(block`--gap: ${'a'}px ${'b'}px;`);
     assert.equal(variables[0].length, 2);
     assert.match(css, /--gap:var\(--\w+\) var\(--\w+\)/);
+  });
+});
+
+describe('`type()`', () => {
+  test('a typed variable uses its default as `initial-value`', async () => {
+    const { classes, variables, css } = await compile(
+      block`width: var(${'w'}px type(<length>), 120px);`,
+    );
+    assert.deepEqual(classes, ['A']);
+    assert.deepEqual(variables[0][0].slot, { strings: ['', 'px'], expressions: [0] });
+    assert.equal(
+      css,
+      '@property --A{syntax:"<length>";inherits:false;initial-value:120px}\n.A{width:var(--A)}',
+    );
+  });
+
+  test('the type follows every value in the argument', async () => {
+    const { variables, css } = await compile(
+      block`margin-top: var(${'a'}px ${'b'}px type(<length>+), 0px);`,
+    );
+    assert.equal(variables[0].length, 1);
+    assert.deepEqual(variables[0][0].slot.strings, ['', 'px ', 'px']);
+    assert.match(css, /syntax:"<length>\+"/);
+  });
+
+  test('keywords and combinators', async () => {
+    const { css } = await compile(block`width: var(${'w'} type(<length> | auto), auto);`);
+    assert.match(css, /syntax:"<length>\|auto";inherits:false;initial-value:auto/);
+  });
+
+  test('`type(*)` is the same as no type', async () => {
+    const { css } = await compile(block`width: var(${'w'} type(*), 1px);`);
+    assert.equal(css, '@property --A{syntax:"*";inherits:false}\n.A{width:var(--A,1px)}');
+  });
+
+  test('each type and default has its own variable', async () => {
+    const { classes, variables, css } = await compile(
+      block`width: var(${'a'} type(<length>), 1px);`,
+      block`width: var(${'b'} type(<length>), 2px);`,
+      block`width: var(${'c'} type(<length>), 1px);`,
+      block`width: var(${'d'} type(<length-percentage>), 1px);`,
+    );
+    assert.equal(classes[0], classes[2]);
+    assert.notEqual(classes[0], classes[1]);
+    assert.notEqual(variables[0][0].name, variables[1][0].name);
+    assert.equal(variables[0][0].name, variables[2][0].name);
+    assert.notEqual(variables[0][0].name, variables[3][0].name);
+    assert.equal(css.match(/@property/g)!.length, 3);
+  });
+
+  test('blocks that differ only by type stay separate', async () => {
+    const { css } = await compile(
+      block`color: var(${'a'} type(<color>), red);`,
+      block`color: var(${'b'} type(<custom-ident>), red);`,
+    );
+    assert.match(css, /syntax:"<color>"/);
+    assert.match(css, /syntax:"<custom-ident>"/);
+  });
+
+  test('a custom property registers itself', async () => {
+    const { classes, variables, css } = await compile(
+      block`--brand: var(${'c'} type(<color>), #f00); color: var(--brand);`,
+    );
+    assert.deepEqual(classes, ['A']);
+    assert.equal(variables[0][0].property, '--brand');
+    assert.equal(
+      css,
+      '@property --brand{syntax:"<color>";inherits:false;initial-value:red}\n.A{color:var(--brand)}',
+    );
+  });
+
+  test('under a selector variant, a custom property goes through a variable', async () => {
+    const { variables, css } = await compile(
+      block`&:hover { --brand: var(${'c'} type(<color>), #f00); }`,
+    );
+    assert.equal(variables[0][0].property, '--A');
+    assert.match(css, /@property --A\{syntax:"<color>"/);
+    assert.match(css, /\.A:hover\{--brand:var\(--A\)\}/);
+  });
+
+  test('in `@keyframes`', async () => {
+    const { css } = await compile(
+      block`@keyframes k { to { width: var(${'w'}px type(<length>), 10px); } }`,
+    );
+    assert.match(css, /@property --A\{syntax:"<length>";inherits:false;initial-value:10px\}/);
+    assert.match(css, /to\{width:var\(--A\)\}/);
+  });
+
+  test('a default computed by Sass', async () => {
+    const { css } = await compile({
+      ...block`$d: 2px; width: var(${'w'} type(<length>), $d * 2);`,
+      lang: 'scss',
+    });
+    assert.match(css, /initial-value:4px/);
+  });
+
+  test('a default can mention a unit in a string', async () => {
+    const { css } = await compile(block`--label: var(${'l'} type(<string>), "1em");`);
+    assert.match(css, /initial-value:"1em"/);
+  });
+
+  test('absolute and viewport units, `currentColor`, and percentages are allowed', async () => {
+    await compile(block`width: var(${'w'} type(<length>), 1in);`);
+    await compile(block`width: var(${'w'} type(<length>), 1vw);`);
+    await compile(block`color: var(${'c'} type(<color>), currentColor);`);
+    await compile(block`width: var(${'w'} type(<length-percentage>), calc(10% + 1px));`);
+  });
+
+  describe('errors', () => {
+    test('no default', () => {
+      rejects(block`width: var(${'w'} type(<length>));`, /`type\(\)` needs a default/);
+    });
+    test('a runtime value in the default or type', () => {
+      const message = /can't use `\$\{…\}`/;
+      rejects(block`width: var(${'w'} type(<length>), ${'d'});`, message);
+      rejects(block`width: var(--x type(${'t'}), 1px);`, message);
+    });
+    test('a default of the wrong type', async () => {
+      await assert.rejects(
+        compile(block`color: var(${'c'} type(<color>), 10px);`),
+        /`10px` can't be the default of `type\(<color>\)`: it isn't valid/,
+      );
+    });
+    test('an unknown type', async () => {
+      await assert.rejects(
+        compile(block`color: var(${'c'} type(<nope>), 10px);`),
+        /can't be the default of `type\(<nope>\)`/,
+      );
+    });
+    test("a default that depends on where it's used", async () => {
+      for (const value of ['1em', '1rem', '1ch', '1cqw', 'calc(1px + 1em)']) {
+        const input = block`width: var(${'w'} type(<length>), 0px);`;
+        input.strings[1] = input.strings[1].replace('0px', value);
+        await assert.rejects(compile(input), /can't depend on where it's used/);
+      }
+      await assert.rejects(
+        compile(block`width: var(${'w'} type(<length>), env(safe-area-inset-top));`),
+        /can't depend on where it's used/,
+      );
+    });
+    test('`var()` in a default', async () => {
+      await assert.rejects(
+        compile(block`width: var(${'w'} type(<length>), var(--x));`),
+        /isn't valid/,
+      );
+    });
   });
 });
 
