@@ -11,6 +11,7 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 - **Applied:** the rules that apply to the element, most important first. Rules that lose to another rule for the same property are crossed out.
 - **Pseudo-elements:** rules for `::before` and the like, each in its own group.
 - **Not applied right now:** rules from the element's classes that don't apply at the moment, such as `:hover` or a media query that doesn't match.
+- **Runtime values:** for a `${…}`, the rule the runtime generated for its current value, marked **Set at runtime**, so you can see what `var(--A)` holds. Its sources are the rules that read its variable. A value set on another element, such as a parent, appears when it reaches the selected one.
 - **Sources:** every place each rule is used. Click one to open it in your editor.
 - **Order of sources:** files using the most of the element's classes come first, since they're the most likely to have produced it, then alphabetically. This is a best guess: a file with many blocks can rank high too.
 - **Filter:** searches selectors, declarations, at-rules, and file paths.

@@ -1,8 +1,16 @@
-import { buildView, classesToFetch, editorUrl, fileCount, location } from './model.ts';
-import type { Rule, ShownRule, Source, Usages } from './model.ts';
+import {
+  buildView,
+  classesToFetch,
+  editorUrl,
+  fileCount,
+  location,
+  withGenerated,
+} from './model.ts';
+import type { GeneratedRule, Rule, ShownRule, Source, Usages } from './model.ts';
 import {
   call,
   matchRules,
+  readGenerated,
   readSelected,
   SELECTED,
   startFetch,
@@ -96,8 +104,10 @@ function sourceLink(source: Source, editor: string) {
 function sourceList(rule: Rule, editor: string) {
   const box = element('div', 'sources');
   const count = fileCount(rule.sources);
+  // Set by a `${…}`, so it's only in the page, not the CSS file.
+  if (rule.generated) box.append(element('span', 'source-count', 'Set at runtime'));
   if (rule.sources.length === 0) {
-    box.append(element('span', 'source-none', 'Not used in the current code'));
+    if (!rule.generated) box.append(element('span', 'source-none', 'Not used in the current code'));
     return box;
   }
   box.append(element('span', 'source-count', count === 1 ? '1 file' : `${count} files`));
@@ -245,6 +255,11 @@ async function refresh() {
   }
   const classes = classesToFetch(selected.own, selected.context);
   state.lookup = await fetchUsages(classes);
+  if ('usages' in state.lookup) {
+    const generated = await evaluate<GeneratedRule[]>(call(readGenerated, classes));
+    const { usages } = state.lookup;
+    state.lookup = { usages: { ...usages, rules: withGenerated(usages.rules, generated) } };
+  }
   state.matched =
     'usages' in state.lookup
       ? await evaluate<boolean[]>(
