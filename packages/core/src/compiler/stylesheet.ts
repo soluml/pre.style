@@ -22,6 +22,7 @@ import type {
   Position,
   ToPosition,
 } from './block.ts';
+import { localizeCustomProperties } from './custom-properties.ts';
 import { localizeKeyframes } from './keyframes.ts';
 import { compose, isElement } from './selectors.ts';
 
@@ -230,6 +231,13 @@ export function parseStylesheet(
   }
 
   for (const target of classes.values()) target.atoms = dropOverridden(target.atoms);
+  // Custom properties are local to the whole file, like keyframes.
+  if (options.customPropertyLocalization) {
+    const all = [...classes.values()].flatMap((target) => target.atoms);
+    const local = localizeCustomProperties(all, parsed.globals, `file\n${id}`, lang, options);
+    parsed.globals = local.globals;
+    for (const target of classes.values()) target.atoms = local.atoms(target.atoms);
+  }
   // Keyframes are local to the whole file, as in CSS Modules.
   if (options.keyframeLocalization) {
     const local = localizeKeyframes(parsed.globals);

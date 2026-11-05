@@ -861,3 +861,21 @@ describe('runtime values', () => {
     }
   });
 });
+
+describe('custom property localization', () => {
+  test('is set in package.json, and renames what blocks declare', async () => {
+    const files = await buildFixture('local-custom-properties');
+    const css = outputCss(files);
+    const code = outputJs(files);
+    assert.doesNotMatch(css, /--gap|--brand/);
+    assert.match(css, /var\(--shared\)/);
+    assert.doesNotMatch(code, /--brand|pre\.style-variable/);
+    assert.doesNotMatch(css, /pre\.style-variable/);
+  });
+
+  test('a value of the wrong type fails', async () => {
+    await withField('basic', { customPropertyLocalization: 'yes' }, () =>
+      assert.rejects(buildFixture('basic'), /customPropertyLocalization/),
+    );
+  });
+});

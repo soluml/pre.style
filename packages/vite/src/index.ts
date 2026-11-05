@@ -30,7 +30,7 @@ export type { LibraryConfig, PackageConfig };
 
 // Options about how the build writes its output. Options every tool must
 // agree on (`include`, `exclude`, `prependFiles`, `libraries`,
-// `quirksMode`, and `keyframeLocalization`) are set in the `pre.style` field
+// `quirksMode`, `keyframeLocalization`, and `customPropertyLocalization`) are set in the `pre.style` field
 // of the app's package.json.
 export interface PreStyleOptions {
   // Options passed through to Lightning CSS.
@@ -468,17 +468,21 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       const create = () =>
         createCompiler({
           prependFiles: app.config.prependFiles,
-          libraries: libraries.map(({ dir, prependFiles, keyframeLocalization }) => ({
-            dir,
-            prependFiles,
-            keyframeLocalization,
-          })),
+          libraries: libraries.map(
+            ({ dir, prependFiles, keyframeLocalization, customPropertyLocalization }) => ({
+              dir,
+              prependFiles,
+              keyframeLocalization,
+              customPropertyLocalization,
+            }),
+          ),
           lightningcss: options.lightningcss,
           sourceMap: options.sourceMap ?? config.command !== 'build',
           root: app.dir,
           warn: (message) => config.logger.warn(`[pre.style] ${message}`),
           quirksMode: app.config.quirksMode,
           keyframeLocalization: app.config.keyframeLocalization,
+          customPropertyLocalization: app.config.customPropertyLocalization,
           layer: options.layer,
         });
       // Dev names blocks on demand, as they're served.

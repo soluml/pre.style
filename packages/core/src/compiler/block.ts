@@ -8,6 +8,7 @@ import type {
 } from 'lightningcss';
 import { atRuleInfo } from './at-rules.ts';
 import { expand } from './expand.ts';
+import { localizeCustomProperties } from './custom-properties.ts';
 import { SLOT_PREFIX } from './interpolate.ts';
 import { localizeKeyframes } from './keyframes.ts';
 import { compose, fromPlaceholder, isElement, PLACEHOLDER, repair } from './selectors.ts';
@@ -105,6 +106,9 @@ export interface ParseOptions {
   // Give each `@keyframes` a generated name, used only in its own block or
   // stylesheet file.
   keyframeLocalization: boolean;
+  // Give each custom property a block or stylesheet file declares a generated
+  // name, used only there.
+  customPropertyLocalization: boolean;
 }
 
 // JSON keys used to deduplicate. Locations are left out, so identical rules
@@ -206,6 +210,11 @@ export function parseBlock(code: string, lang: Lang, options: ParseOptions): Par
 
   let atoms = dropOverridden(parsed.atoms);
   let { globals } = parsed;
+  if (options.customPropertyLocalization) {
+    const local = localizeCustomProperties(atoms, globals, `block\n${code}`, lang, options);
+    atoms = local.atoms(atoms);
+    ({ globals } = local);
+  }
   let variables: Variable[] | undefined;
   if (code.includes(SLOT_PREFIX))
     ({ atoms, globals, variables } = extractVariables(atoms, globals));

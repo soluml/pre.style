@@ -61,6 +61,10 @@
         "prependFiles": {
           "$ref": "#/definitions/prependFiles"
         },
+        "customPropertyLocalization": {
+          "description": "Give each custom property declared in the library's blocks and stylesheet files a generated name, used only in the block or file that declares it. Names it only reads, and names from prepended files, stay global. The app's setting doesn't apply to libraries.",
+          "type": "boolean"
+        },
         "keyframeLocalization": {
           "description": "Give each @keyframes in the library's blocks and stylesheet files a generated name, used only in the block or file that defines it, like styled-components' `keyframes`. The app's setting doesn't apply to libraries.",
           "type": "boolean"
@@ -87,6 +91,10 @@
         },
         "prependFiles": {
           "$ref": "#/definitions/prependFiles"
+        },
+        "customPropertyLocalization": {
+          "description": "Give each custom property declared in the app's blocks and stylesheet files a generated name, used only in the block or file that declares it. Names it only reads, and names from prepended files, stay global. Libraries use their own setting.",
+          "type": "boolean"
         },
         "keyframeLocalization": {
           "description": "Give each @keyframes in the app's blocks and stylesheet files a generated name, used only in the block or file that defines it (including keyframes from prepended files), like styled-components' `keyframes`. Libraries use their own setting.",
