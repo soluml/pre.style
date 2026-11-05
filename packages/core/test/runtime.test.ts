@@ -1,5 +1,6 @@
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 // Server-side behavior is tested before a document exists, since the runtime
 // keeps one stylesheet for the page.
@@ -209,6 +210,42 @@ describe('in the browser', () => {
     assert.deepEqual([...rule.properties], [['--brand', '#00f']]);
   });
 
+  test('sets a variable where the declaration reading it is', () => {
+    const result = runtime.dynamic('', ['x'], ['A', ['', ''], [0], 0, ['', '::before']]);
+    const rule = rules().find((r) => r.selector === `.${result}::before`)!;
+    assert.deepEqual([...rule.properties], [['--A', 'x']]);
+  });
+
+  test('a selector the browser rejects is ignored', () => {
+    const insertRule = FakeSheet.prototype.insertRule;
+    FakeSheet.prototype.insertRule = () => {
+      throw new SyntaxError('invalid selector');
+    };
+    try {
+      assert.match(runtime.dynamic('', ['y'], ['Z', ['', ''], [0], 0, ['', '::nope']]), /^_Z/);
+    } finally {
+      FakeSheet.prototype.insertRule = insertRule;
+    }
+  });
+
+  test('a browser without constructable stylesheets keeps the defaults', async () => {
+    // A separate copy, so it has no stylesheet yet.
+    const path = '../src/runtime.ts?old-browser';
+    const fresh = await import(path);
+    const constructor = globalThis.CSSStyleSheet;
+    Object.assign(globalThis, {
+      CSSStyleSheet() {
+        throw new TypeError('Illegal constructor');
+      },
+    });
+    try {
+      const result = fresh.dynamic('A', ['x'], ['A', ['', ''], [0]]);
+      assert.match(result, /^A _A/);
+    } finally {
+      Object.assign(globalThis, { CSSStyleSheet: constructor });
+    }
+  });
+
   test('a missing value inserts nothing', () => {
     const before = rules().length;
     dynamic('A', ['A', ['', ''], [null]]);
@@ -222,4 +259,37 @@ describe('in the browser', () => {
   test('returns the same class string as the server', () => {
     assert.equal(dynamic('A', ['A', ['', 'px'], [240]]).split(' ')[1], '_AFyfJ');
   });
+});
+
+// The runtime has to work in every Baseline browser. These are the platform APIs
+// it uses, each checked against MDN's compatibility data, with when it became
+// Baseline. Using a new one fails this test: check it's Baseline, then add it.
+const BASELINE_APIS = new Set([
+  'CSSStyleSheet', // March 2023, with `document.adoptedStyleSheets`.
+  'Map', // Long before Baseline.
+  'Set', // Long before Baseline.
+  'TypeError', // Long before Baseline.
+  'document.adoptedStyleSheets', // March 2023, including `push`.
+  'sheet.cssRules', // Long before Baseline.
+  'sheet.insertRule', // Long before Baseline.
+  'style.setProperty', // Long before Baseline.
+  'Math.floor', // Long before Baseline.
+  'Math.imul', // Long before Baseline.
+  'Number.isFinite', // Long before Baseline.
+  'Object.hasOwn', // March 2022.
+]);
+
+test('the runtime only uses platform APIs known to be Baseline', () => {
+  const source = readFileSync(new URL('../src/runtime.ts', import.meta.url), 'utf8').replace(
+    /\/\/.*$/gm,
+    '',
+  );
+  const used = [
+    ...source.matchAll(
+      /\b(?:document|window|navigator|globalThis|sheet|style|Math|Number|Object|Array|Reflect|Intl|CSS)\.\w+/g,
+    ),
+    ...source.matchAll(/\b(?:new|extends) ([A-Z]\w+)/g),
+  ].map((match) => match[1] ?? match[0]);
+  for (const api of used) assert.ok(BASELINE_APIS.has(api), `${api} isn't checked yet`);
+  assert.ok(used.includes('document.adoptedStyleSheets'), 'the check found no APIs');
 });

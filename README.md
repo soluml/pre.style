@@ -246,6 +246,31 @@ css`
 }
 ```
 
+Values work in nested selectors too, including pseudo-elements and other elements. The generated class's rule uses the same selector, so the value reaches them. `content` needs a string, so pass one:
+
+```js
+css`
+  &::before {
+    content: var(${JSON.stringify(String(count))}, "0");
+  }
+
+  & > * {
+    margin-top: ${gap}px;
+  }
+
+  & + li {
+    color: ${color};
+  }
+`;
+```
+
+```css
+/* Inserted by the runtime */
+._A3fK9::before {
+  --A: "5";
+}
+```
+
 #### Custom properties
 
 A custom property set directly on the element is set by name. It needs no generated variable or `@property`, only the generated class:
@@ -401,6 +426,21 @@ Values must be strings or numbers, or `null` or `undefined` to use the default. 
 The server renders the same class strings as the browser, so hydration matches, but it doesn't write the generated rules. The page uses the defaults until the runtime sets the values in the browser, so pick a default close to the usual value to avoid a visible jump. Without a default, the declaration has no effect until then.
 
 Values need code that runs in the browser. `${…}` fails the build in HTML, and in the frontmatter and templates of Astro components, where it could never be set (Astro client scripts are fine). React Server Components have the same problem, but the build can't detect it there: use client components for blocks with values.
+
+#### Browser support
+
+Runtime values work in every [Baseline](https://developer.mozilla.org/en-US/docs/Glossary/Baseline/Compatibility) browser. They need [constructable stylesheets](https://caniuse.com/mdn-api_document_adoptedstylesheets) and [`@property`](https://caniuse.com/mdn-css_at-rules_property), so they fully work from:
+
+| Chrome and Edge | Firefox | Safari and iOS Safari | Samsung Internet |
+| --- | --- | --- | --- |
+| 99 | 128 | 16.4 | 18 |
+
+In older browsers:
+
+- **Without `@property`** (Firefox 101 to 127), values work, but an element with no value of its own takes its parent's instead of its default, and a typed value has no default.
+- **Without constructable stylesheets, or where they can't be added to** (Chrome before 99, Firefox before 101, Safari before 16.4), values aren't set, so the page keeps its defaults.
+
+`@keyframes` works wherever these do. `@position-try` is newer: it needs Chrome 125, Firefox 147, or Safari 26. `@function` isn't Baseline: it needs Chrome 139, and isn't yet in Firefox or Safari, so a block using it there keeps the rest of its styles but not the function's.
 
 #### When to use `style` instead
 

@@ -2,12 +2,14 @@ import type { CnLookup } from './cn.ts';
 
 // What the bundler plugin passes for each variable a block sets: its short
 // name, the text around its values, which of the block's values they are, and
-// the custom property it sets, when that isn't `--<name>`.
+// the custom property it sets, when that isn't `--<name>`, and where to set it,
+// split where the class goes, when that isn't the element.
 export type RuntimeVariable = [
   name: string,
   strings: readonly string[],
   indexes: readonly number[],
-  property?: string,
+  property?: string | 0,
+  selector?: readonly string[],
 ];
 
 const DIGITS = '0123456789';
@@ -62,28 +64,40 @@ const inserted = new Set<string>();
 
 // Inserts a generated class's rule once. `setProperty` parses the value alone,
 // so a value can't add rules or declarations, even if it comes from a user.
-function insert(className: string, property: string, value: string) {
+function insert(selector: string, className: string, property: string, value: string) {
   if (inserted.has(className)) return;
   inserted.add(className);
-  if (sheet === undefined) {
-    sheet = new CSSStyleSheet();
-    document.adoptedStyleSheets.push(sheet);
-  }
-  const index = sheet.insertRule(`.${className}{}`, sheet.cssRules.length);
-  (sheet.cssRules[index] as CSSStyleRule).style.setProperty(property, value);
+  // An unknown selector is ignored, as it is in the CSS file. Browsers without
+  // constructable stylesheets, or where the list can't be changed (Chrome before
+  // 99, Firefox before 101, Safari before 16.4), keep the defaults rather than
+  // failing the render.
+  try {
+    if (sheet === undefined) {
+      sheet = new CSSStyleSheet();
+      document.adoptedStyleSheets.push(sheet);
+    }
+    const index = sheet.insertRule(`${selector}{}`, sheet.cssRules.length);
+    (sheet.cssRules[index] as CSSStyleRule).style.setProperty(property, value);
+  } catch {}
 }
 
 export const create =
   (alphabet: string, invalid: InvalidValue) =>
   (classes: string, values: readonly unknown[], ...variables: RuntimeVariable[]): string => {
     let result = classes;
-    for (const [name, strings, indexes, property = `--${name}`] of variables) {
+    for (const [name, strings, indexes, property, selector] of variables) {
       const value = text(strings, indexes, values, invalid);
       if (value === null) continue;
       const className = `_${name}${hash(value, alphabet)}`;
       // The server returns the same class strings, without the rules, so
       // hydration matches and the page uses its defaults until this runs.
-      if (typeof document !== 'undefined') insert(className, property, value);
+      if (typeof document !== 'undefined')
+        insert(
+          selector ? selector.join(`.${className}`) : `.${className}`,
+          className,
+          property || `--${name}`,
+          value,
+        );
       result += result === '' ? className : ` ${className}`;
     }
     return result;

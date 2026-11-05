@@ -340,7 +340,14 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
             variable.name,
             variable.slot.strings,
             variable.slot.expressions,
-            ...(variable.property === `--${variable.name}` ? [] : [variable.property]),
+            ...(variable.selector !== null
+              ? [
+                  variable.property === `--${variable.name}` ? 0 : variable.property,
+                  variable.selector,
+                ]
+              : variable.property === `--${variable.name}`
+                ? []
+                : [variable.property]),
           ]),
         );
         s.overwrite(

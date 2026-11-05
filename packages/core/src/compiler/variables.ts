@@ -6,6 +6,7 @@ import type { Atom, GlobalRule, Position } from './block.ts';
 import { atRuleInfo } from './at-rules.ts';
 import { SLOT_PREFIX } from './interpolate.ts';
 import { print } from './print.ts';
+import { withClass } from './selectors.ts';
 
 // A variable a block's runtime values set. In parsed rules, a generated
 // variable's name is this prefix and a hash of what it's for, and the compiler
@@ -20,6 +21,10 @@ export interface Variable {
   property: string | null;
   // The block's slot that holds its value.
   slot: number;
+  // Where to set it, when the declaration that reads it isn't on the element,
+  // such as `&::before` or `& > *`: the selector, split where the class goes.
+  // Variables don't inherit, and a sibling couldn't inherit one anyway.
+  selector: string[] | null;
 }
 
 type VarNode = { type: 'var'; value: { name: { ident: string }; fallback?: unknown } };
@@ -72,6 +77,49 @@ function directSlot(atom: Atom): VarNode | null {
 
 const hash = (identity: unknown) =>
   createHash('sha256').update(JSON.stringify(identity)).digest('base64url').slice(0, 16);
+
+const SELF = '__pre-style-self__';
+
+// A declaration's selector, for where to set its variables. Null when it's the
+// element itself, as for `&:hover` and `.dark &`.
+function selectorOf(atom: Atom): string[] | null {
+  if (atom.variant === null) return null;
+  const selectors = withClass(atom.variant.selectors, SELF);
+  const onElement = selectors.every((selector) => {
+    const compound = selector.slice(selector.findLastIndex((c) => c.type === 'combinator') + 1);
+    return (
+      compound.some((c) => c.type === 'class' && c.name === SELF) &&
+      !compound.some((c) => c.type === 'pseudo-element')
+    );
+  });
+  if (onElement) return null;
+  const rule = {
+    type: 'style',
+    value: {
+      selectors,
+      // Empty rules aren't printed.
+      declarations: {
+        declarations: [
+          {
+            property: 'custom',
+            value: {
+              name: '--z',
+              value: [{ type: 'token', value: { type: 'ident', value: 'z' } }],
+            },
+          },
+        ],
+      },
+      rules: [],
+      loc: { source_index: 0, line: 0, column: 1 },
+    },
+  } as unknown as Rule;
+  const { code } = print([rule], [], {}, false);
+  return code
+    .slice(0, code.indexOf('{'))
+    .trim()
+    .replace(/\s*\n\s*/g, ' ')
+    .split(`.${SELF}`);
+}
 
 const atomIdentity = (atom: Atom, index: number) => [
   atom.atRules.map((segment) => segment.key),
@@ -185,11 +233,12 @@ function useVariable(
   variables: Variable[],
   added: Map<string, GlobalRule>,
   position: Position | null,
+  selector: string[] | null = null,
 ) {
   const initial = syntax === null ? null : defaultText(node);
   const variable = hash([identity, syntax, initial]);
   const name = VARIABLE_PREFIX + variable;
-  variables.push({ key: variable, property: null, slot });
+  variables.push({ key: variable, property: null, slot, selector });
   node.value.name.ident = name;
   if (syntax !== null) node.value.fallback = null;
   if (added.has(variable)) return;
@@ -251,7 +300,12 @@ export function extractVariables(
     const direct = directSlot(atom);
     if (direct !== null) {
       const { slot, syntax } = parseSlot(direct);
-      variables.push({ key: `direct:${atom.property}`, property: atom.property, slot });
+      variables.push({
+        key: `direct:${atom.property}`,
+        property: atom.property,
+        slot,
+        selector: null,
+      });
       // A typed custom property registers itself, under its own name.
       if (syntax !== null) {
         const registered = typedRegistration(
@@ -268,11 +322,12 @@ export function extractVariables(
       continue;
     }
     const value = structuredClone(atom.declaration.value);
+    const selector = selectorOf(atom);
     let index = 0;
     eachSlot(value, (node) => {
       const { slot, syntax } = parseSlot(node);
       const identity = atomIdentity(atom, index++);
-      useVariable(node, identity, slot, syntax, variables, added, atom.position);
+      useVariable(node, identity, slot, syntax, variables, added, atom.position, selector);
     });
     keptAtoms.push({
       ...atom,

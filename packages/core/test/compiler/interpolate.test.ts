@@ -42,7 +42,14 @@ describe('runtime values', () => {
     const { classes, variables, css } = await compile(block`width: ${'w'}px;`);
     assert.deepEqual(classes, ['A']);
     assert.deepEqual(variables, [
-      [{ name: 'A', property: '--A', slot: { strings: ['', 'px'], expressions: [0] } }],
+      [
+        {
+          name: 'A',
+          property: '--A',
+          slot: { strings: ['', 'px'], expressions: [0] },
+          selector: null,
+        },
+      ],
     ]);
     assert.equal(css, '@property --A{syntax:"*";inherits:false}\n.A{width:var(--A)}');
   });
@@ -98,6 +105,35 @@ describe('runtime values', () => {
   test('different selector variants get different variables', async () => {
     const { variables } = await compile(block`width: ${'a'}px; &:hover { width: ${'b'}px; }`);
     assert.notEqual(variables[0][0].name, variables[0][1].name);
+  });
+
+  test('a declaration on the element is set on the element', async () => {
+    for (const input of [
+      block`width: ${'w'}px;`,
+      block`&:hover { width: ${'w'}px; }`,
+      block`.dark & { width: ${'w'}px; }`,
+      block`&.a:focus-visible { width: ${'w'}px; }`,
+      block`@media (width > 1px) { &:hover { width: ${'w'}px; } }`,
+    ])
+      assert.equal((await compile(input)).variables[0][0].selector, null);
+  });
+
+  test('a declaration elsewhere is set where it is', async () => {
+    const selector = async (input: ReturnType<typeof block>) =>
+      (await compile(input)).variables[0][0].selector;
+    assert.deepEqual(await selector(block`&::before { content: ${'c'}; }`), ['', ':before']);
+    assert.deepEqual(await selector(block`&:hover::after { content: ${'c'}; }`), [
+      '',
+      ':hover:after',
+    ]);
+    assert.deepEqual(await selector(block`& > * { width: ${'w'}px; }`), ['', ' > *']);
+    assert.deepEqual(await selector(block`& + li { width: ${'w'}px; }`), ['', ' + li']);
+    assert.deepEqual(await selector(block`.dark & > a { width: ${'w'}px; }`), ['.dark ', ' > a']);
+    assert.deepEqual(await selector(block`& a, &::before { width: ${'w'}px; }`), [
+      '',
+      ' a, ',
+      ':before',
+    ]);
   });
 
   test('atoms match the same `var()` written by hand', async () => {

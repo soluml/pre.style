@@ -86,6 +86,9 @@ export interface BlockVariable {
   property: string;
   // The text and expressions that make up its value.
   slot: Slot;
+  // Where to set it, split where the generated class goes, when the
+  // declaration reading it isn't on the element. Null when it is.
+  selector: string[] | null;
 }
 
 // A stylesheet file, imported with `with { type: 'pre.style' }`. Each class
@@ -335,6 +338,7 @@ export class Compiler {
         name,
         property: variable.property ?? `--${name}`,
         slot: block.slots![variable.slot],
+        selector: variable.selector,
       };
     });
   }
