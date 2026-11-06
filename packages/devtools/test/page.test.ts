@@ -18,6 +18,7 @@ interface Fake {
   parentElement: Fake | null;
   previousElementSibling: Fake | null;
   matches?(selector: string): boolean;
+  getAttribute?(name: string): string | null;
 }
 
 const fake = (fields: Partial<Fake> = {}): Element =>
@@ -66,7 +67,23 @@ describe('readSelected', () => {
       label: 'div#x.a.b',
       own: ['a', 'b'],
       context: ['sibling', 'parent', 'uncle'],
+      at: null,
+      from: null,
     });
+  });
+
+  test('reads where its class attribute is written', () => {
+    const attributes: Record<string, string> = {
+      'data-pre-style-at': 'src/Button.tsx:4:11',
+      'data-pre-style-from': 'src/App.tsx:9:13',
+    };
+    const element = fake({
+      getAttribute: (name: string) => attributes[name] ?? null,
+    } as Partial<Fake>);
+    assert.deepEqual(
+      [readSelected(element)?.at, readSelected(element)?.from],
+      ['src/Button.tsx:4:11', 'src/App.tsx:9:13'],
+    );
   });
 });
 

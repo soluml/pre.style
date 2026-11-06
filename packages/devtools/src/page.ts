@@ -11,6 +11,11 @@ export interface Selected {
   // Classes of the elements a selector could go through to reach it: its
   // ancestors, and their and its earlier siblings.
   context: string[];
+  // Where its class attribute is written (`path:line:column`, relative to the
+  // app), and where a component it's in was given one, from attributes the
+  // dev server adds.
+  at: string | null;
+  from: string | null;
 }
 
 export function readSelected(element: Element | null | undefined): Selected | null {
@@ -28,7 +33,13 @@ export function readSelected(element: Element | null | undefined): Selected | nu
   }
   const id = element.id ? `#${element.id}` : '';
   const classes = own.map((name) => `.${name}`).join('');
-  return { label: `${element.localName}${id}${classes}`, own, context: [...context] };
+  return {
+    label: `${element.localName}${id}${classes}`,
+    own,
+    context: [...context],
+    at: element.getAttribute?.('data-pre-style-at') ?? null,
+    from: element.getAttribute?.('data-pre-style-from') ?? null,
+  };
 }
 
 // Whether each rule currently applies to the element. A rule for a pseudo-element

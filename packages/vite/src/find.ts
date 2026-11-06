@@ -59,11 +59,25 @@ export interface CnCall {
   args: (string | FoundBlock | SheetClass | CnCall)[] | null;
 }
 
+// A `className` or `class` attribute in JSX, which dev marks with where it's
+// written, for the DevTools extension.
+export interface ClassAttribute {
+  // Just after the attribute, where another can be added.
+  end: number;
+  // Where the attribute starts, from 1.
+  line: number;
+  column: number;
+  // On a component (`<Button>`, `<ui.Button>`) rather than an element
+  // (`<button>`), so it only reaches the DOM if the component passes it on.
+  component: boolean;
+}
+
 export interface ScriptAnalysis {
   blocks: FoundBlock[];
   imports: FoundImport[];
   sheets: SheetImport[];
   cnCalls: CnCall[];
+  classAttributes: ClassAttribute[];
 }
 
 export class FindError extends Error {
@@ -77,6 +91,7 @@ export class FindError extends Error {
 }
 
 const IMPORTS = new Set(['css', 'scss', 'cn']);
+const CLASS_ATTRIBUTES = new Set(['className', 'class']);
 
 type Attribute = { key: { name?: string; value?: string }; value: { value: unknown } };
 
@@ -316,9 +331,27 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
   const declarations = new Map<string, { node: Node; scope: Node }[]>();
   const functions: Node[] = [];
   const parents = new Map<Node, Node | null>();
+  const classAttributes: ClassAttribute[] = [];
 
   walk(program, null, (node, parent) => {
     parents.set(node, parent);
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      CLASS_ATTRIBUTES.has(node.name.name) &&
+      parent?.type === 'JSXOpeningElement'
+    ) {
+      const { name } = parent;
+      classAttributes.push({
+        end: node.end,
+        ...locate(node.start),
+        // As JSX decides: lowercase names and namespaced ones (`svg:circle`)
+        // are elements.
+        component:
+          name.type === 'JSXMemberExpression' ||
+          (name.type === 'JSXIdentifier' && !/^[a-z]/.test(name.name)),
+      });
+    }
     for (const [names, scope] of declaredNames(node, parent)) {
       let visible: Node = node;
       if (scope !== 'self') {
@@ -485,7 +518,7 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
   };
   for (const node of cnNodes) cnCall(node);
 
-  return { blocks, imports, sheets, cnCalls: [...cnCalls.values()] };
+  return { blocks, imports, sheets, cnCalls: [...cnCalls.values()], classAttributes };
 }
 
 const HTML_BLOCK = /\b(s?css)`([^`]*)`/g;

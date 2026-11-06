@@ -45,6 +45,9 @@ export interface PreStyleOptions {
   // Generate a source map for the output CSS. Defaults to on in dev and off
   // in builds.
   sourceMap?: boolean;
+  // In dev, mark each JSX class attribute with where it's written, for the
+  // DevTools extension. Needs `sourceMap`. Off by default.
+  devtools?: boolean;
   // Wrap the output CSS in a cascade layer: `false` (the default) for none,
   // `''` for an unnamed layer, or the layer's name.
   layer?: false | string;
@@ -96,6 +99,10 @@ const RESOLVED_CSS_ID = '/__pre.style.css';
 // `?classes=A,B`. Bump the version when the response changes.
 const USAGES_PATH = '/__pre.style/usages';
 const USAGES_VERSION = 1;
+// Dev-only attributes with where a class attribute is written: on an element,
+// and on a component, which reaches the DOM if the component passes it on.
+const AT_ATTRIBUTE = 'data-pre-style-at';
+const FROM_ATTRIBUTE = 'data-pre-style-from';
 
 const toArray = (value: string | string[] | undefined) =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -165,6 +172,10 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
   const footer = options.output?.footer ?? '';
 
   let config: ResolvedConfig;
+  // Whether class attributes say where they're written. Only in dev, and
+  // only when the usages endpoint is there to go with them.
+  const markAttributes = () =>
+    options.devtools === true && options.sourceMap !== false && config.command !== 'build';
   // The app's package.json field, and the directory its paths are relative
   // to.
   let app: { dir: string; config: PackageConfig } = { dir: process.cwd(), config: {} };
@@ -383,6 +394,17 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       // query marks the import for `resolveId`.
       for (const sheet of analysis.sheets)
         s.overwrite(sheet.start, sheet.end, JSON.stringify(sheet.specifier + SHEET_QUERY));
+      // In dev, each class attribute says where it's written, so the DevTools
+      // extension can link an element to the line that gave it its classes.
+      // Compiled Astro components aren't JSX, so they have none.
+      if (markAttributes()) {
+        const path = relative(config.root, file).split(sep).join('/');
+        for (const { end, line, column, component } of analysis.classAttributes)
+          s.appendLeft(
+            end,
+            ` ${component ? FROM_ATTRIBUTE : AT_ATTRIBUTE}={${JSON.stringify(`${path}:${line}:${column}`)}}`,
+          );
+      }
     } catch (error) {
       return fail(context, error, file);
     }
@@ -452,6 +474,12 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
             version: USAGES_VERSION,
             // `/__open-in-editor` is behind the base, unlike this endpoint.
             editor: `${config.base}__open-in-editor`,
+            // What the paths in class attributes' `data-pre-style-at` are
+            // relative to.
+            root: config.root,
+            // Whether those attributes are added, so the pane can say how
+            // to turn them on.
+            classAttributes: markAttributes(),
             rules: usages.map((usage) => ({
               ...usage,
               sources: usage.sources.map((source) => ({

@@ -644,6 +644,27 @@ describe('dev', () => {
     }
   });
 
+  test('with `devtools`, class attributes say where they are written', async () => {
+    const transformed = async (options: PreStyleOptions) => {
+      const server = await createServer({
+        ...config('jsx', options),
+        server: { middlewareMode: true, ws: false },
+      });
+      try {
+        return (await server.transformRequest('/src/App.tsx'))!.code;
+      } finally {
+        await server.close();
+      }
+    };
+    const code = await transformed({ devtools: true });
+    assert.match(code, /className: box,\s*"data-pre-style-at": "src\/App\.tsx:10:9"/);
+    assert.match(code, /className: "[^"]+",\s*"data-pre-style-from": "src\/App\.tsx:11:11"/);
+    assert.match(code, /class: "plain",\s*"data-pre-style-from": "src\/App\.tsx:12:15"/);
+    assert.equal((code.match(/data-pre-style-/g) ?? []).length, 3);
+    assert.doesNotMatch(await transformed({}), /data-pre-style-/);
+    assert.doesNotMatch(await transformed({ devtools: true, sourceMap: false }), /data-pre-style-/);
+  });
+
   test('the usages endpoint lists where classes are used', async () => {
     const server = await createServer({
       ...config('basic', {}),
@@ -657,9 +678,11 @@ describe('dev', () => {
       const className = /\.([\w-]+) ?\{/.exec(css!.code)![1];
       const response = await fetch(`${url}__pre.style/usages?classes=${className},nope`);
       assert.match(response.headers.get('content-type')!, /application\/json/);
-      const { version, editor, rules } = await response.json();
+      const { version, editor, root, classAttributes, rules } = await response.json();
       assert.equal(version, 1);
       assert.equal(editor, '/__open-in-editor');
+      assert.equal(root, fixture('basic'));
+      assert.equal(classAttributes, false);
       assert.equal(rules.length, 1);
       assert.equal(rules[0].className, className);
       assert.equal(rules[0].sources[0].file, `${fixture('basic')}/src/main.ts`);

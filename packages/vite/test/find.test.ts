@@ -214,3 +214,30 @@ describe('blocks in Astro components', () => {
     assert.equal(findInComponent('css`width: ${w}px;`')[0].code, compiled.code);
   });
 });
+
+describe('class attributes in JSX', () => {
+  test('are found on elements and components, with where they start', () => {
+    const source = `import { css } from '@pre.style/core';
+const a = <div className={css\`color: red;\`} id="x" />;
+const b = <Card className="c" />;
+const c = <ui.Badge class={x} />;
+const d = <svg:circle className="e" />;
+const e = <span data-x className />;
+const f = <p {...props} />;
+`;
+    const { classAttributes } = findInScript('test.tsx', source)!;
+    assert.deepEqual(
+      classAttributes.map(({ end, ...rest }) => ({
+        ...rest,
+        before: source.slice(end - 1, end + 1),
+      })),
+      [
+        { line: 2, column: 16, component: false, before: '} ' },
+        { line: 3, column: 17, component: true, before: '" ' },
+        { line: 4, column: 21, component: true, before: '} ' },
+        { line: 5, column: 23, component: false, before: '" ' },
+        { line: 6, column: 24, component: false, before: 'e ' },
+      ],
+    );
+  });
+});

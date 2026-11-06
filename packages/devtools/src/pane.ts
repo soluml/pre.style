@@ -1,4 +1,5 @@
 import {
+  attributeSource,
   buildView,
   classesToFetch,
   editorUrl,
@@ -141,6 +142,36 @@ function ruleCard(rule: Rule & Partial<ShownRule>, editor: string) {
   return card;
 }
 
+// Where the element got its classes: the class attribute on a component it's
+// in, when that's passed on, and the one on the element itself.
+function usedAt(selected: Selected, usages: Usages): HTMLElement | null {
+  const rows = (
+    [
+      ['Passed in', attributeSource(selected.from, usages.root)],
+      ['On the element', attributeSource(selected.at, usages.root)],
+    ] as const
+  ).flatMap(([title, source]) => {
+    if (source === null) return [];
+    const row = element('div', 'used-at-row');
+    row.append(element('span', 'used-at-label', title), sourceLink(source, usages.editor));
+    return [row];
+  });
+  const box = element('div', 'used-at');
+  if (rows.length === 0) {
+    if (usages.classAttributes !== false) return null;
+    box.append(
+      element(
+        'span',
+        'used-at-off',
+        'To link to the line that sets this element’s classes, turn on @pre.style/vite’s devtools option.',
+      ),
+    );
+    return section('Class attribute', [box]);
+  }
+  box.append(...rows);
+  return section('Class attribute', [box]);
+}
+
 function section(title: string, cards: HTMLElement[], className = '') {
   const box = element('section', `group ${className}`);
   box.append(element('h2', 'group-title', title), ...cards);
@@ -195,6 +226,10 @@ function render() {
   const view = buildView(usages.rules, matched, selected.own, filterInput.value);
   const { editor } = usages;
   const groups: HTMLElement[] = [];
+  if (view.applied.length + view.pseudo.length + view.inactive.length > 0) {
+    const attribute = usedAt(selected, usages);
+    if (attribute !== null) groups.push(attribute);
+  }
   if (view.applied.length > 0)
     groups.push(
       section(

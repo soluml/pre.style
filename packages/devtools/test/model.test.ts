@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
+  attributeSource,
   buildView,
   classesToFetch,
   compareCascade,
@@ -416,5 +417,17 @@ describe('withGenerated', () => {
 
   test('no generated rules changes nothing', () => {
     assert.deepEqual(withGenerated([reader], []), [reader]);
+  });
+
+  test('attributeSource reads a class attribute’s location', () => {
+    assert.deepEqual(attributeSource('src/a:b.tsx:4:11', '/app/'), {
+      file: '/app/src/a:b.tsx',
+      path: 'src/a:b.tsx',
+      line: 4,
+      column: 11,
+    });
+    assert.equal(attributeSource('src/a.tsx:4:11', undefined), null);
+    assert.equal(attributeSource('src/a.tsx', '/app'), null);
+    assert.equal(attributeSource(null, '/app'), null);
   });
 });
