@@ -222,6 +222,15 @@ describe('manifest', () => {
     }
   });
 
+  test('has a toolbar icon and a background script for it, as each browser runs them', () => {
+    for (const browser of ['chrome', 'firefox'] as const)
+      assert.deepEqual(manifest(browser, '1.0.0', 'd').action.default_icon, { 128: 'icon.png' });
+    assert.deepEqual(manifest('chrome', '1.0.0', 'd').background, {
+      service_worker: 'background.js',
+    });
+    assert.deepEqual(manifest('firefox', '1.0.0', 'd').background, { scripts: ['background.js'] });
+  });
+
   test('only Firefox gets an add-on ID', () => {
     assert.equal('browser_specific_settings' in manifest('chrome', '1.0.0', 'd'), false);
     assert.equal(

@@ -8,58 +8,18 @@ import {
   withGenerated,
 } from './model.ts';
 import type { GeneratedRule, Rule, ShownRule, Source, Usages } from './model.ts';
-import {
-  call,
-  matchRules,
-  readGenerated,
-  readSelected,
-  SELECTED,
-  startFetch,
-  takeFetched,
-  whenAllowed,
-} from './page.ts';
+import { call, matchRules, readGenerated, readSelected, SELECTED, whenAllowed } from './page.ts';
 import type { Selected } from './page.ts';
 import { onHostsChanged, readHosts } from './hosts.ts';
+import { evaluate, fetchUsages } from './lookup.ts';
+import type { Lookup } from './lookup.ts';
 
-const USAGES_URL = '/__pre.style/usages';
-const USAGES_VERSION = 1;
-const FETCH_TIMEOUT = 5000;
 // Sources shown for a rule before the rest are folded away.
 const SOURCES_SHOWN = 5;
 
-const evaluate = <T>(expression: string) =>
-  new Promise<T>((resolve, reject) => {
-    chrome.devtools.inspectedWindow.eval(expression, (result, exception) => {
-      if (exception) reject(new Error(exception.value ?? exception.code ?? 'eval failed'));
-      else resolve(result as T);
-    });
-  });
-
-type Lookup = { usages: Usages } | { problem: 'not-local' | 'no-server' | 'outdated' };
-
-let fetches = 0;
 // Hostnames from the settings. Empty until they're read, so nothing extra is
 // allowed before then.
 let extraHosts: string[] = [];
-
-async function fetchUsages(classes: string[]): Promise<Lookup> {
-  const id = `f${++fetches}`;
-  const url = `${USAGES_URL}?classes=${classes.map(encodeURIComponent).join(',')}`;
-  if (!(await evaluate<boolean>(whenAllowed(call(startFetch, id, url), extraHosts))))
-    return { problem: 'not-local' };
-  const deadline = Date.now() + FETCH_TIMEOUT;
-  while (Date.now() < deadline) {
-    const result = await evaluate<ReturnType<typeof takeFetched>>(call(takeFetched, id));
-    if (result !== null) {
-      if ('error' in result || result.status !== 200 || !result.type?.includes('json'))
-        return { problem: 'no-server' };
-      const usages = JSON.parse(result.body) as Usages;
-      return usages.version === USAGES_VERSION ? { usages } : { problem: 'outdated' };
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return { problem: 'no-server' };
-}
 
 const content = document.querySelector<HTMLElement>('#content')!;
 const label = document.querySelector<HTMLElement>('#label')!;
@@ -289,7 +249,7 @@ async function refresh() {
     return;
   }
   const classes = classesToFetch(selected.own, selected.context);
-  state.lookup = await fetchUsages(classes);
+  state.lookup = await fetchUsages(classes, extraHosts);
   if ('usages' in state.lookup) {
     const generated = await evaluate<GeneratedRule[]>(call(readGenerated, classes));
     const { usages } = state.lookup;

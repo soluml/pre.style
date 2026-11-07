@@ -16,6 +16,7 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 - **Sources:** every place each rule is used. Click one to open it in your editor.
 - **Order of sources:** files using the most of the element's classes come first, since they're the most likely to have produced it, then alphabetically. This is a best guess: a file with many blocks can rank high too.
 - **Filter:** searches selectors, declarations, at-rules, and file paths.
+- **Toolbar icon:** in color while DevTools is open on a tab and the selected element has pre.style classes, gray otherwise, whether or not the pane is open.
 
 ## Requirements
 

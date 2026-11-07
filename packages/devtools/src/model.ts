@@ -186,6 +186,10 @@ export function buildView(rules: Rule[], matched: boolean[], own: string[], filt
 export const classesToFetch = (own: string[], context: string[]) =>
   [...new Set([...own, ...context])].filter((name) => /^[\w-]+$/.test(name)).toSorted();
 
+// Whether any of the dev server's rules is for one of the element's own classes.
+export const hasRules = (rules: Rule[], own: string[]) =>
+  rules.some(({ className }) => own.includes(className));
+
 export const fileCount = (sources: Source[]) => new Set(sources.map(({ file }) => file)).size;
 
 export const location = ({ path, line, column }: Source) => `${path}:${line}:${column}`;

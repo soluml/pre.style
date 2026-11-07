@@ -7,6 +7,7 @@ import {
   compareCascade,
   editorUrl,
   fileCount,
+  hasRules,
   withGenerated,
 } from '../src/model.ts';
 import type { Rule } from '../src/model.ts';
@@ -282,6 +283,13 @@ describe('source order', () => {
 describe('helpers', () => {
   test('classesToFetch dedupes, sorts, and drops names that need escaping', () => {
     assert.deepEqual(classesToFetch(['b', 'a'], ['a', 'c', 'w-[1px]']), ['a', 'b', 'c']);
+  });
+
+  test('hasRules is whether a rule is for one of the element’s own classes', () => {
+    const rules = [rule({ className: 'a' })];
+    assert.equal(hasRules(rules, ['x', 'a']), true);
+    assert.equal(hasRules(rules, ['x']), false);
+    assert.equal(hasRules([], ['a']), false);
   });
 
   test('fileCount counts files, not locations', () => {

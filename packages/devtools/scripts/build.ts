@@ -16,7 +16,9 @@ for (const browser of BROWSERS) {
     await copyFile(path(`static/${file}`), `${out}/${file}`);
   await copyFile(path('../vscode/images/icon.png'), `${out}/icon.png`);
   await build({
-    entryPoints: [path('src/devtools.ts'), path('src/pane.ts'), path('src/options.ts')],
+    entryPoints: ['devtools', 'pane', 'options', 'background'].map((name) =>
+      path(`src/${name}.ts`),
+    ),
     outdir: out,
     bundle: true,
     format: 'iife',
