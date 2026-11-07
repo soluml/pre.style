@@ -14,7 +14,7 @@
     "astro": "^7.4.2"
   },
   "devDependencies": {
-    "@pre.style/vite": "3.1.0-alpha.7",
+    "@pre.style/vite": "3.1.0-alpha.8",
     "lightningcss": "^1.33.0",
     "sass": "^1.107.0",
     "typescript": "7.1.0-beta",
