@@ -452,6 +452,11 @@ describe('stylesheet files', () => {
       );
       assert.match(sheet!.code, /export const unused = "[A-Za-z]+";/);
 
+      // Asked for as a plain stylesheet, as Astro does for the page's styles,
+      // it's empty: it isn't plain CSS.
+      const plain = await server.transformRequest('/src/button.css?inline');
+      assert.match(plain!.code, /export default ""/);
+
       // Changing the file updates its module, and the modules that compose from it.
       const file = `${fixture('sheets')}/src/theme.scss`;
       const graph = server.environments.client.moduleGraph;

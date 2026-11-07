@@ -201,6 +201,9 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
   // For each file a module's class strings depend on (through `composes`
   // or Sass loads), the IDs of those modules, so dev updates them.
   const dependents = new Map<string, Set<string>>();
+  // Stylesheet files imported with `type: 'pre.style'`, which dev serves as
+  // empty CSS if they're asked for as plain stylesheets (see `load`).
+  const sheetFiles = new Set<string>();
   const track = (context: { addWatchFile(file: string): void }, files: string[], id: string) => {
     for (const file of files) {
       context.addWatchFile(file);
@@ -620,8 +623,17 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
     },
 
     async load(id) {
+      // A stylesheet file is a watched dependency of its module, which Vite's
+      // module graph records as an import. Astro collects a page's styles
+      // from that graph in dev, so it asks for the file as a plain
+      // stylesheet, which it isn't: compiled by Vite alone, `composes` and
+      // prepended Sass mixins fail. It has no plain CSS to give, so it's empty.
+      // Not watching it would break updates: Astro only refreshes its server
+      // modules when the changed file is in their graph.
+      if (server !== undefined && sheetFiles.has(cleanId(id))) return { code: '', map: null };
       if (id.startsWith(SHEET_PREFIX)) {
         const file = id.slice(SHEET_PREFIX.length, -SHEET_SUFFIX.length);
+        if (server !== undefined) sheetFiles.add(file);
         const revision = compiler.revision;
         let compiled: CompiledStylesheet;
         try {

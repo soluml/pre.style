@@ -22,6 +22,7 @@ export default defineConfig({
     plugins: [
       preStyle({
         lightningcss: { minify: true },
+        devtools: true,
       }),
     ],
   },
