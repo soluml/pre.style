@@ -9,6 +9,7 @@ import {
   defaultClientConditions,
   defaultServerConditions,
 } from 'vite';
+import { MagicString } from 'magic-string';
 import type { InlineConfig, Plugin, Rollup } from 'vite';
 import preStyle from '../src/index.ts';
 import type { PreStyleOptions } from '../src/index.ts';
@@ -668,6 +669,53 @@ describe('dev', () => {
     assert.equal((code.match(/data-pre-style-/g) ?? []).length, 3);
     assert.doesNotMatch(await transformed({}), /data-pre-style-/);
     assert.doesNotMatch(await transformed({ devtools: true, sourceMap: false }), /data-pre-style-/);
+  });
+
+  test('with `devtools`, class attributes in Astro components say where they are written', async () => {
+    // Writes `Card.astro` the way Astro's compiler does, as far as this test
+    // needs, with a source map like its own: each attribute and prop maps to
+    // where it starts.
+    const compileAstro: Plugin = {
+      name: 'fake-astro',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.endsWith('.astro')) return;
+        const s = new MagicString(code);
+        let at = 0;
+        const replace = (from: string, to: string) => {
+          const start = code.indexOf(from, at);
+          at = start + from.length;
+          s.overwrite(start, at, to);
+        };
+        replace('---\n', '');
+        replace('---\n', 'export default () => $$render`');
+        replace(' ', '');
+        replace('class={', '${$$addAttribute(');
+        replace('}>', ', "class")}>');
+        replace('<Box ', '${$$renderComponent($$result, "Box", Box, { ');
+        replace('className={card}', '"className": card');
+        replace(' tone=', ', "tone": ');
+        replace(' />', ' })}');
+        s.append('`;');
+        return { code: s.toString(), map: s.generateMap({ hires: true }), moduleType: 'js' };
+      },
+    };
+    const server = await createServer({
+      ...config('jsx', { devtools: true }),
+      plugins: [...config('jsx', { devtools: true }).plugins!, compileAstro],
+      server: { middlewareMode: true, ws: false },
+    });
+    try {
+      const { code } = (await server.transformRequest('/src/Card.astro'))!;
+      assert.match(
+        code,
+        /\$\$addAttribute\(card, "class"\)\}\$\{\$\$addAttribute\("src\/Card\.astro:7:6", "data-pre-style-at"\)\}>/,
+      );
+      assert.match(code, /\{ "data-pre-style-from": "src\/Card\.astro:8:8", "className": card,/);
+      assert.equal((code.match(/data-pre-style-/g) ?? []).length, 2);
+    } finally {
+      await server.close();
+    }
   });
 
   test('the usages endpoint lists where classes are used', async () => {

@@ -227,16 +227,42 @@ const f = <p {...props} />;
 `;
     const { classAttributes } = findInScript('test.tsx', source)!;
     assert.deepEqual(
-      classAttributes.map(({ end, ...rest }) => ({
+      classAttributes.map(({ insert, syntax, ...rest }) => ({
         ...rest,
-        before: source.slice(end - 1, end + 1),
+        syntax,
+        before: source.slice(insert - 1, insert + 1),
       })),
       [
-        { line: 2, column: 16, component: false, before: '} ' },
-        { line: 3, column: 17, component: true, before: '" ' },
-        { line: 4, column: 21, component: true, before: '} ' },
-        { line: 5, column: 23, component: false, before: '" ' },
-        { line: 6, column: 24, component: false, before: 'e ' },
+        { line: 2, column: 16, component: false, syntax: 'jsx', before: '} ' },
+        { line: 3, column: 17, component: true, syntax: 'jsx', before: '" ' },
+        { line: 4, column: 21, component: true, syntax: 'jsx', before: '} ' },
+        { line: 5, column: 23, component: false, syntax: 'jsx', before: '" ' },
+        { line: 6, column: 24, component: false, syntax: 'jsx', before: 'e ' },
+      ],
+    );
+  });
+
+  test('are found in compiled Astro components', () => {
+    // As Astro's compiler writes them.
+    const source = `import { css } from '@pre.style/core';
+const $$Page = $$createComponent(($$result) => {
+  return $$render\`<h1\${$$addAttribute(title, "class")}>Hi</h1>
+<p\${$$addAttribute(["a", b], "class:list")} data-x>
+<a\${$$addAttribute(href, "href")}>\${$$renderComponent($$result, "Button", Button, { "tone": "x", "className": arrow })}
+\${$$renderComponent($$result, "Card", Card, { "class": "c" }, { "default": () => $$render\`x\` })}\`;
+});
+`;
+    const { classAttributes } = findInScript('Page.astro.ts', source)!;
+    assert.deepEqual(
+      classAttributes.map(({ insert, ...rest }) => ({
+        ...rest,
+        after: source.slice(insert, insert + 2),
+      })),
+      [
+        { line: 3, column: 24, component: false, syntax: 'template', after: '>H' },
+        { line: 4, column: 5, component: false, syntax: 'template', after: ' d' },
+        { line: 5, column: 98, component: true, syntax: 'props', after: '"c' },
+        { line: 6, column: 47, component: true, syntax: 'props', after: '"c' },
       ],
     );
   });

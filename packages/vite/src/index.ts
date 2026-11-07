@@ -1,5 +1,6 @@
 import { readFile, glob } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
+import { decode } from '@jridgewell/sourcemap-codec';
 import { MagicString } from 'magic-string';
 import { createCn } from '@pre.style/core';
 import type { CnTable } from '@pre.style/core';
@@ -399,14 +400,25 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
         s.overwrite(sheet.start, sheet.end, JSON.stringify(sheet.specifier + SHEET_QUERY));
       // In dev, each class attribute says where it's written, so the DevTools
       // extension can link an element to the line that gave it its classes.
-      // Compiled Astro components aren't JSX, so they have none.
-      if (markAttributes()) {
+      // A compiled Astro component's are located through Astro's source map.
+      if (markAttributes() && analysis.classAttributes.length > 0) {
         const path = relative(config.root, file).split(sep).join('/');
-        for (const { end, line, column, component } of analysis.classAttributes)
+        const original =
+          source === undefined ? null : originalPosition(context.getCombinedSourcemap());
+        for (const attribute of analysis.classAttributes) {
+          const at = original === null ? attribute : original(attribute);
+          if (at === null) continue;
+          const name = attribute.component ? FROM_ATTRIBUTE : AT_ATTRIBUTE;
+          const value = JSON.stringify(`${path}:${at.line}:${at.column}`);
           s.appendLeft(
-            end,
-            ` ${component ? FROM_ATTRIBUTE : AT_ATTRIBUTE}={${JSON.stringify(`${path}:${line}:${column}`)}}`,
+            attribute.insert,
+            attribute.syntax === 'jsx'
+              ? ` ${name}={${value}}`
+              : attribute.syntax === 'template'
+                ? `\${$$addAttribute(${value}, ${JSON.stringify(name)})}`
+                : `${JSON.stringify(name)}: ${value}, `,
           );
+        }
       }
     } catch (error) {
       return fail(context, error, file);
@@ -791,6 +803,21 @@ function sheetModule(exports: CompiledStylesheet['exports']): string {
 
 function quoted(value: string, quote: string): string {
   return `${quote}${value}${quote}`;
+}
+
+// Looks up where a line and column (from 1) of a script came from, through
+// its source map: the closest mapped position at or before it on its line,
+// or null when there's none.
+function originalPosition(map: { mappings: string }) {
+  const lines = decode(map.mappings);
+  return ({ line, column }: { line: number; column: number }) => {
+    let found: number[] | undefined;
+    for (const segment of lines[line - 1] ?? []) {
+      if (segment[0] > column - 1) break;
+      if (segment.length >= 4) found = segment;
+    }
+    return found === undefined ? null : { line: found[2] + 1, column: found[3] + 1 };
+  };
 }
 
 // Removes `css` and `scss` from `@pre.style/core` imports (the blocks are gone),
