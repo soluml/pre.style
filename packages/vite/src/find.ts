@@ -59,11 +59,31 @@ export interface CnCall {
   args: (string | FoundBlock | SheetClass | CnCall)[] | null;
 }
 
+// A `className` or `class` attribute in JSX, or in a compiled Astro
+// component, which dev marks with where it's written, for the DevTools
+// extension.
+export interface ClassAttribute {
+  // Where another attribute can be added, written as `syntax` says: after a
+  // JSX attribute, after a compiled Astro attribute's `${…}` in its template
+  // (`template`), or before a prop in a compiled Astro component's props
+  // object (`props`).
+  insert: number;
+  syntax: 'jsx' | 'template' | 'props';
+  // Where the attribute starts in `code`, from 1. In compiled Astro, the
+  // source map gives where it's written.
+  line: number;
+  column: number;
+  // On a component (`<Button>`, `<ui.Button>`) rather than an element
+  // (`<button>`), so it only reaches the DOM if the component passes it on.
+  component: boolean;
+}
+
 export interface ScriptAnalysis {
   blocks: FoundBlock[];
   imports: FoundImport[];
   sheets: SheetImport[];
   cnCalls: CnCall[];
+  classAttributes: ClassAttribute[];
 }
 
 export class FindError extends Error {
@@ -77,6 +97,14 @@ export class FindError extends Error {
 }
 
 const IMPORTS = new Set(['css', 'scss', 'cn']);
+const CLASS_ATTRIBUTES = new Set(['className', 'class']);
+// Astro's too, which its compiler writes as `$$addAttribute(value, "class")`
+// in an element's template, and as a key of a component's props in
+// `$$renderComponent($$result, "Name", Name, { "class": value })`.
+const ASTRO_CLASS_ATTRIBUTES = new Set(['className', 'class', 'class:list']);
+
+const stringValue = (node: Node | undefined) =>
+  node?.type === 'Literal' && typeof node.value === 'string' ? (node.value as string) : null;
 
 type Attribute = { key: { name?: string; value?: string }; value: { value: unknown } };
 
@@ -316,9 +344,59 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
   const declarations = new Map<string, { node: Node; scope: Node }[]>();
   const functions: Node[] = [];
   const parents = new Map<Node, Node | null>();
+  const classAttributes: ClassAttribute[] = [];
 
   walk(program, null, (node, parent) => {
     parents.set(node, parent);
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      CLASS_ATTRIBUTES.has(node.name.name) &&
+      parent?.type === 'JSXOpeningElement'
+    ) {
+      const { name } = parent;
+      classAttributes.push({
+        insert: node.end,
+        syntax: 'jsx',
+        ...locate(node.start),
+        // As JSX decides: lowercase names and namespaced ones (`svg:circle`)
+        // are elements.
+        component:
+          name.type === 'JSXMemberExpression' ||
+          (name.type === 'JSXIdentifier' && !/^[a-z]/.test(name.name)),
+      });
+    }
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'Identifier' &&
+      parent?.type === 'TemplateLiteral' &&
+      node.callee.name === '$$addAttribute' &&
+      ASTRO_CLASS_ATTRIBUTES.has(stringValue(node.arguments[1]) ?? '') &&
+      code[node.end] === '}'
+    )
+      classAttributes.push({
+        insert: node.end + 1,
+        syntax: 'template',
+        ...locate(node.start),
+        component: false,
+      });
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === '$$renderComponent' &&
+      node.arguments[3]?.type === 'ObjectExpression'
+    )
+      for (const property of node.arguments[3].properties as Node[])
+        if (
+          property.type === 'Property' &&
+          ASTRO_CLASS_ATTRIBUTES.has(stringValue(property.key) ?? '')
+        )
+          classAttributes.push({
+            insert: property.start,
+            syntax: 'props',
+            ...locate(property.start),
+            component: true,
+          });
     for (const [names, scope] of declaredNames(node, parent)) {
       let visible: Node = node;
       if (scope !== 'self') {
@@ -485,7 +563,7 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
   };
   for (const node of cnNodes) cnCall(node);
 
-  return { blocks, imports, sheets, cnCalls: [...cnCalls.values()] };
+  return { blocks, imports, sheets, cnCalls: [...cnCalls.values()], classAttributes };
 }
 
 const HTML_BLOCK = /\b(s?css)`([^`]*)`/g;

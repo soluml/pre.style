@@ -35,6 +35,12 @@ export interface GeneratedRule {
 export interface Usages {
   version: number;
   editor: string;
+  // The app's root, which the paths in class attributes are relative to.
+  // Missing from older versions of the plugin.
+  root?: string;
+  // Whether the plugin marks class attributes (its `sourceAttributes` option).
+  // Missing from older versions of the plugin.
+  classAttributes?: boolean;
   rules: Rule[];
 }
 
@@ -180,9 +186,27 @@ export function buildView(rules: Rule[], matched: boolean[], own: string[], filt
 export const classesToFetch = (own: string[], context: string[]) =>
   [...new Set([...own, ...context])].filter((name) => /^[\w-]+$/.test(name)).toSorted();
 
+// Whether any of the dev server's rules is for one of the element's own classes.
+export const hasRules = (rules: Rule[], own: string[]) =>
+  rules.some(({ className }) => own.includes(className));
+
 export const fileCount = (sources: Source[]) => new Set(sources.map(({ file }) => file)).size;
 
 export const location = ({ path, line, column }: Source) => `${path}:${line}:${column}`;
+
+// A `path:line:column` from a class attribute, as a source. Null when it can't
+// be read.
+export function attributeSource(value: string | null, root: string | undefined): Source | null {
+  const match = value === null ? null : /^(.+):(\d+):(\d+)$/.exec(value);
+  if (match === null || root === undefined) return null;
+  const [, path, line, column] = match;
+  return {
+    file: `${root.replace(/\/$/, '')}/${path}`,
+    path,
+    line: Number(line),
+    column: Number(column),
+  };
+}
 
 // The URL that opens a source in the editor, through Vite's route.
 export const editorUrl = (editor: string, { file, line, column }: Source) =>

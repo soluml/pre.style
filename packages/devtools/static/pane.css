@@ -189,6 +189,30 @@ body {
   text-decoration: underline;
 }
 
+.used-at {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.used-at-row {
+  display: contents;
+}
+
+.used-at-off {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.used-at-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .source-more {
   width: 100%;
 }

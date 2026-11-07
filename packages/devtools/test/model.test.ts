@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
+  attributeSource,
   buildView,
   classesToFetch,
   compareCascade,
   editorUrl,
   fileCount,
+  hasRules,
   withGenerated,
 } from '../src/model.ts';
 import type { Rule } from '../src/model.ts';
@@ -283,6 +285,13 @@ describe('helpers', () => {
     assert.deepEqual(classesToFetch(['b', 'a'], ['a', 'c', 'w-[1px]']), ['a', 'b', 'c']);
   });
 
+  test('hasRules is whether a rule is for one of the element’s own classes', () => {
+    const rules = [rule({ className: 'a' })];
+    assert.equal(hasRules(rules, ['x', 'a']), true);
+    assert.equal(hasRules(rules, ['x']), false);
+    assert.equal(hasRules([], ['a']), false);
+  });
+
   test('fileCount counts files, not locations', () => {
     assert.equal(fileCount([at('/a', 1), at('/a', 9), at('/b', 1)]), 2);
   });
@@ -416,5 +425,17 @@ describe('withGenerated', () => {
 
   test('no generated rules changes nothing', () => {
     assert.deepEqual(withGenerated([reader], []), [reader]);
+  });
+
+  test('attributeSource reads a class attribute’s location', () => {
+    assert.deepEqual(attributeSource('src/a:b.tsx:4:11', '/app/'), {
+      file: '/app/src/a:b.tsx',
+      path: 'src/a:b.tsx',
+      line: 4,
+      column: 11,
+    });
+    assert.equal(attributeSource('src/a.tsx:4:11', undefined), null);
+    assert.equal(attributeSource('src/a.tsx', '/app'), null);
+    assert.equal(attributeSource(null, '/app'), null);
   });
 });

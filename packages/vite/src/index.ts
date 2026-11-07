@@ -1,5 +1,6 @@
 import { readFile, glob } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
+import { decode } from '@jridgewell/sourcemap-codec';
 import { MagicString } from 'magic-string';
 import { createCn } from '@pre.style/core';
 import type { CnTable } from '@pre.style/core';
@@ -45,6 +46,11 @@ export interface PreStyleOptions {
   // Generate a source map for the output CSS. Defaults to on in dev and off
   // in builds.
   sourceMap?: boolean;
+  // In dev, mark each class attribute in JSX and Astro components with where
+  // it's written, for the DevTools extension. Needs `sourceMap`. On by
+  // default, except in test runs (Vite's `test` mode, as in Vitest), where it
+  // would change rendered markup. Never in builds.
+  sourceAttributes?: boolean;
   // Wrap the output CSS in a cascade layer: `false` (the default) for none,
   // `''` for an unnamed layer, or the layer's name.
   layer?: false | string;
@@ -96,6 +102,10 @@ const RESOLVED_CSS_ID = '/__pre.style.css';
 // `?classes=A,B`. Bump the version when the response changes.
 const USAGES_PATH = '/__pre.style/usages';
 const USAGES_VERSION = 1;
+// Dev-only attributes with where a class attribute is written: on an element,
+// and on a component, which reaches the DOM if the component passes it on.
+const AT_ATTRIBUTE = 'data-pre-style-at';
+const FROM_ATTRIBUTE = 'data-pre-style-from';
 
 const toArray = (value: string | string[] | undefined) =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -165,6 +175,12 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
   const footer = options.output?.footer ?? '';
 
   let config: ResolvedConfig;
+  // Whether class attributes say where they're written. Only in dev, and
+  // only when the usages endpoint is there to go with them.
+  const markAttributes = () =>
+    options.sourceMap !== false &&
+    config.command !== 'build' &&
+    (options.sourceAttributes ?? config.mode !== 'test');
   // The app's package.json field, and the directory its paths are relative
   // to.
   let app: { dir: string; config: PackageConfig } = { dir: process.cwd(), config: {} };
@@ -190,6 +206,9 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
   // For each file a module's class strings depend on (through `composes`
   // or Sass loads), the IDs of those modules, so dev updates them.
   const dependents = new Map<string, Set<string>>();
+  // Stylesheet files imported with `type: 'pre.style'`, which dev serves as
+  // empty CSS if they're asked for as plain stylesheets (see `load`).
+  const sheetFiles = new Set<string>();
   const track = (context: { addWatchFile(file: string): void }, files: string[], id: string) => {
     for (const file of files) {
       context.addWatchFile(file);
@@ -383,6 +402,28 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
       // query marks the import for `resolveId`.
       for (const sheet of analysis.sheets)
         s.overwrite(sheet.start, sheet.end, JSON.stringify(sheet.specifier + SHEET_QUERY));
+      // In dev, each class attribute says where it's written, so the DevTools
+      // extension can link an element to the line that gave it its classes.
+      // A compiled Astro component's are located through Astro's source map.
+      if (markAttributes() && analysis.classAttributes.length > 0) {
+        const path = relative(config.root, file).split(sep).join('/');
+        const original =
+          source === undefined ? null : originalPosition(context.getCombinedSourcemap());
+        for (const attribute of analysis.classAttributes) {
+          const at = original === null ? attribute : original(attribute);
+          if (at === null) continue;
+          const name = attribute.component ? FROM_ATTRIBUTE : AT_ATTRIBUTE;
+          const value = JSON.stringify(`${path}:${at.line}:${at.column}`);
+          s.appendLeft(
+            attribute.insert,
+            attribute.syntax === 'jsx'
+              ? ` ${name}={${value}}`
+              : attribute.syntax === 'template'
+                ? `\${$$addAttribute(${value}, ${JSON.stringify(name)})}`
+                : `${JSON.stringify(name)}: ${value}, `,
+          );
+        }
+      }
     } catch (error) {
       return fail(context, error, file);
     }
@@ -452,6 +493,12 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
             version: USAGES_VERSION,
             // `/__open-in-editor` is behind the base, unlike this endpoint.
             editor: `${config.base}__open-in-editor`,
+            // What the paths in class attributes' `data-pre-style-at` are
+            // relative to.
+            root: config.root,
+            // Whether those attributes are added, so the pane can say how
+            // to turn them on.
+            classAttributes: markAttributes(),
             rules: usages.map((usage) => ({
               ...usage,
               sources: usage.sources.map((source) => ({
@@ -592,8 +639,17 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
     },
 
     async load(id) {
+      // A stylesheet file is a watched dependency of its module, which Vite's
+      // module graph records as an import. Astro collects a page's styles
+      // from that graph in dev, so it asks for the file as a plain
+      // stylesheet, which it isn't: compiled by Vite alone, `composes` and
+      // prepended Sass mixins fail. It has no plain CSS to give, so it's empty.
+      // Not watching it would break updates: Astro only refreshes its server
+      // modules when the changed file is in their graph.
+      if (server !== undefined && sheetFiles.has(cleanId(id))) return { code: '', map: null };
       if (id.startsWith(SHEET_PREFIX)) {
         const file = id.slice(SHEET_PREFIX.length, -SHEET_SUFFIX.length);
+        if (server !== undefined) sheetFiles.add(file);
         const revision = compiler.revision;
         let compiled: CompiledStylesheet;
         try {
@@ -751,6 +807,21 @@ function sheetModule(exports: CompiledStylesheet['exports']): string {
 
 function quoted(value: string, quote: string): string {
   return `${quote}${value}${quote}`;
+}
+
+// Looks up where a line and column (from 1) of a script came from, through
+// its source map: the closest mapped position at or before it on its line,
+// or null when there's none.
+function originalPosition(map: { mappings: string }) {
+  const lines = decode(map.mappings);
+  return ({ line, column }: { line: number; column: number }) => {
+    let found: number[] | undefined;
+    for (const segment of lines[line - 1] ?? []) {
+      if (segment[0] > column - 1) break;
+      if (segment.length >= 4) found = segment;
+    }
+    return found === undefined ? null : { line: found[2] + 1, column: found[3] + 1 };
+  };
 }
 
 // Removes `css` and `scss` from `@pre.style/core` imports (the blocks are gone),

@@ -11,6 +11,11 @@ export function manifest(browser: Browser, version: string, description: string)
     description,
     homepage_url: 'https://pre.style',
     icons: { 128: 'icon.png' },
+    // Gray unless the selected element has pre.style classes.
+    action: { default_icon: { 128: 'icon.png' }, default_title: 'pre.style DevTools' },
+    // Chrome runs it as a service worker, Firefox as an event page.
+    background:
+      browser === 'chrome' ? { service_worker: 'background.js' } : { scripts: ['background.js'] },
     devtools_page: 'devtools.html',
     options_ui: { page: 'options.html' },
     permissions: ['storage'],

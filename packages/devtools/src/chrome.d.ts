@@ -3,6 +3,7 @@
 // namespace for extensions with a `devtools_page`.
 declare namespace chrome.devtools {
   namespace inspectedWindow {
+    const tabId: number;
     // oxlint-disable-next-line no-shadow-restricted-names
     function eval(
       expression: string,
@@ -30,6 +31,20 @@ declare namespace chrome.devtools {
 declare namespace chrome.runtime {
   const lastError: { message?: string } | undefined;
   function openOptionsPage(): void;
+  interface Port {
+    name: string;
+    postMessage(message: unknown): void;
+    onMessage: { addListener(listener: (message: unknown) => void): void };
+    onDisconnect: { addListener(listener: () => void): void };
+  }
+  function connect(info: { name: string }): Port;
+  const onConnect: { addListener(listener: (port: Port) => void): void };
+}
+
+// Only in the background script.
+declare namespace chrome.action {
+  function enable(tabId?: number): Promise<void>;
+  function disable(tabId?: number): Promise<void>;
 }
 
 // Missing if a browser doesn't offer it to DevTools pages.

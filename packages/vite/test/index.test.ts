@@ -9,6 +9,7 @@ import {
   defaultClientConditions,
   defaultServerConditions,
 } from 'vite';
+import { MagicString } from 'magic-string';
 import type { InlineConfig, Plugin, Rollup } from 'vite';
 import preStyle from '../src/index.ts';
 import type { PreStyleOptions } from '../src/index.ts';
@@ -452,6 +453,11 @@ describe('stylesheet files', () => {
       );
       assert.match(sheet!.code, /export const unused = "[A-Za-z]+";/);
 
+      // Asked for as a plain stylesheet, as Astro does for the page's styles,
+      // it's empty: it isn't plain CSS.
+      const plain = await server.transformRequest('/src/button.css?inline');
+      assert.match(plain!.code, /export default ""/);
+
       // Changing the file updates its module, and the modules that compose from it.
       const file = `${fixture('sheets')}/src/theme.scss`;
       const graph = server.environments.client.moduleGraph;
@@ -644,6 +650,81 @@ describe('dev', () => {
     }
   });
 
+  test('class attributes say where they are written', async () => {
+    const transformed = async (options: PreStyleOptions, mode?: string) => {
+      const server = await createServer({
+        ...config('jsx', options),
+        mode,
+        server: { middlewareMode: true, ws: false },
+      });
+      try {
+        return (await server.transformRequest('/src/App.tsx'))!.code;
+      } finally {
+        await server.close();
+      }
+    };
+    const code = await transformed({});
+    assert.match(code, /className: box,\s*"data-pre-style-at": "src\/App\.tsx:10:9"/);
+    assert.match(code, /className: "[^"]+",\s*"data-pre-style-from": "src\/App\.tsx:11:11"/);
+    assert.match(code, /class: "plain",\s*"data-pre-style-from": "src\/App\.tsx:12:15"/);
+    assert.equal((code.match(/data-pre-style-/g) ?? []).length, 3);
+    assert.doesNotMatch(await transformed({ sourceAttributes: false }), /data-pre-style-/);
+    assert.doesNotMatch(
+      await transformed({ sourceAttributes: true, sourceMap: false }),
+      /data-pre-style-/,
+    );
+    // Test runs (Vitest's mode) only have them when asked for.
+    assert.doesNotMatch(await transformed({}, 'test'), /data-pre-style-/);
+    assert.match(await transformed({ sourceAttributes: true }, 'test'), /data-pre-style-at/);
+  });
+
+  test('class attributes in Astro components say where they are written', async () => {
+    // Writes `Card.astro` the way Astro's compiler does, as far as this test
+    // needs, with a source map like its own: each attribute and prop maps to
+    // where it starts.
+    const compileAstro: Plugin = {
+      name: 'fake-astro',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.endsWith('.astro')) return;
+        const s = new MagicString(code);
+        let at = 0;
+        const replace = (from: string, to: string) => {
+          const start = code.indexOf(from, at);
+          at = start + from.length;
+          s.overwrite(start, at, to);
+        };
+        replace('---\n', '');
+        replace('---\n', 'export default () => $$render`');
+        replace(' ', '');
+        replace('class={', '${$$addAttribute(');
+        replace('}>', ', "class")}>');
+        replace('<Box ', '${$$renderComponent($$result, "Box", Box, { ');
+        replace('className={card}', '"className": card');
+        replace(' tone=', ', "tone": ');
+        replace(' />', ' })}');
+        s.append('`;');
+        return { code: s.toString(), map: s.generateMap({ hires: true }), moduleType: 'js' };
+      },
+    };
+    const server = await createServer({
+      ...config('jsx', {}),
+      plugins: [...config('jsx', {}).plugins!, compileAstro],
+      server: { middlewareMode: true, ws: false },
+    });
+    try {
+      const { code } = (await server.transformRequest('/src/Card.astro'))!;
+      assert.match(
+        code,
+        /\$\$addAttribute\(card, "class"\)\}\$\{\$\$addAttribute\("src\/Card\.astro:7:6", "data-pre-style-at"\)\}>/,
+      );
+      assert.match(code, /\{ "data-pre-style-from": "src\/Card\.astro:8:8", "className": card,/);
+      assert.equal((code.match(/data-pre-style-/g) ?? []).length, 2);
+    } finally {
+      await server.close();
+    }
+  });
+
   test('the usages endpoint lists where classes are used', async () => {
     const server = await createServer({
       ...config('basic', {}),
@@ -657,9 +738,11 @@ describe('dev', () => {
       const className = /\.([\w-]+) ?\{/.exec(css!.code)![1];
       const response = await fetch(`${url}__pre.style/usages?classes=${className},nope`);
       assert.match(response.headers.get('content-type')!, /application\/json/);
-      const { version, editor, rules } = await response.json();
+      const { version, editor, root, classAttributes, rules } = await response.json();
       assert.equal(version, 1);
       assert.equal(editor, '/__open-in-editor');
+      assert.equal(root, fixture('basic'));
+      assert.equal(classAttributes, true);
       assert.equal(rules.length, 1);
       assert.equal(rules[0].className, className);
       assert.equal(rules[0].sources[0].file, `${fixture('basic')}/src/main.ts`);
