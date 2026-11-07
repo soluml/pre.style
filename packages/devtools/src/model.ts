@@ -38,7 +38,7 @@ export interface Usages {
   // The app's root, which the paths in class attributes are relative to.
   // Missing from older versions of the plugin.
   root?: string;
-  // Whether the plugin marks class attributes (its `devtools` option).
+  // Whether the plugin marks class attributes (its `sourceAttributes` option).
   // Missing from older versions of the plugin.
   classAttributes?: boolean;
   rules: Rule[];

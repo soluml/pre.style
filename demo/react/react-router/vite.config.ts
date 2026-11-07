@@ -28,9 +28,6 @@ export default defineConfig(({ command }) => ({
       // prepending, since the library's own blocks write them to the CSS
       // file.
       lightningcss: { minify: true },
-      // Links elements to the class attributes that set their classes, in
-      // the DevTools extension. Dev only.
-      devtools: true,
       // Source maps in dev only.
       sourceMap: command === 'serve',
     }),

@@ -8,7 +8,7 @@ pre.style's classes are shared, so `color: red` is one class no matter how many 
 
 Select an element, then open the **pre.style** tab next to Styles. If the tab isn't visible, it's in the `»` overflow menu.
 
-- **Class attribute:** with `@pre.style/vite`'s `devtools` option on, where the element got its classes. **Passed in** is the `className` or `class` given to a component (`<Button className={…}>`), and **On the element** is the one on the element itself (`<button className={…}>`). Click one to open it in your editor.
+- **Class attribute:** where the element got its classes. **Passed in** is the `className` or `class` given to a component (`<Button className={…}>`), and **On the element** is the one on the element itself (`<button className={…}>`). Click one to open it in your editor.
 - **Applied:** the rules that apply to the element, most important first. Rules that lose to another rule for the same property are crossed out.
 - **Pseudo-elements:** rules for `::before` and the like, each in its own group.
 - **Not applied right now:** rules from the element's classes that don't apply at the moment, such as `:hover` or a media query that doesn't match.
@@ -22,7 +22,7 @@ Select an element, then open the **pre.style** tab next to Styles. If the tab is
 
 - Chrome (or another Chromium browser) or Firefox 140 or later
 - `@pre.style/vite` with the same version of this extension, running Vite's dev server, with the `sourceMap` option on (the default in dev)
-- For the **Class attribute** section: the plugin's `devtools` option, `preStyle({ devtools: true })`. It adds `data-pre-style-at` and `data-pre-style-from` attributes to your JSX and Astro components in dev, never in builds.
+- For the **Class attribute** section: the plugin's `sourceAttributes` option, on by default in dev. It adds `data-pre-style-at` and `data-pre-style-from` attributes to your JSX and Astro components in dev, never in builds, and in test runs (Vite's `test` mode, as in Vitest) only if you set it to `true`.
 
 The extension's only permission is `storage`, for its settings. It reads from the page you're inspecting, and that page asks its own dev server.
 

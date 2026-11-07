@@ -46,9 +46,11 @@ export interface PreStyleOptions {
   // Generate a source map for the output CSS. Defaults to on in dev and off
   // in builds.
   sourceMap?: boolean;
-  // In dev, mark each JSX class attribute with where it's written, for the
-  // DevTools extension. Needs `sourceMap`. Off by default.
-  devtools?: boolean;
+  // In dev, mark each class attribute in JSX and Astro components with where
+  // it's written, for the DevTools extension. Needs `sourceMap`. On by
+  // default, except in test runs (Vite's `test` mode, as in Vitest), where it
+  // would change rendered markup. Never in builds.
+  sourceAttributes?: boolean;
   // Wrap the output CSS in a cascade layer: `false` (the default) for none,
   // `''` for an unnamed layer, or the layer's name.
   layer?: false | string;
@@ -176,7 +178,9 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
   // Whether class attributes say where they're written. Only in dev, and
   // only when the usages endpoint is there to go with them.
   const markAttributes = () =>
-    options.devtools === true && options.sourceMap !== false && config.command !== 'build';
+    options.sourceMap !== false &&
+    config.command !== 'build' &&
+    (options.sourceAttributes ?? config.mode !== 'test');
   // The app's package.json field, and the directory its paths are relative
   // to.
   let app: { dir: string; config: PackageConfig } = { dir: process.cwd(), config: {} };

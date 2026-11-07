@@ -650,10 +650,11 @@ describe('dev', () => {
     }
   });
 
-  test('with `devtools`, class attributes say where they are written', async () => {
-    const transformed = async (options: PreStyleOptions) => {
+  test('class attributes say where they are written', async () => {
+    const transformed = async (options: PreStyleOptions, mode?: string) => {
       const server = await createServer({
         ...config('jsx', options),
+        mode,
         server: { middlewareMode: true, ws: false },
       });
       try {
@@ -662,16 +663,22 @@ describe('dev', () => {
         await server.close();
       }
     };
-    const code = await transformed({ devtools: true });
+    const code = await transformed({});
     assert.match(code, /className: box,\s*"data-pre-style-at": "src\/App\.tsx:10:9"/);
     assert.match(code, /className: "[^"]+",\s*"data-pre-style-from": "src\/App\.tsx:11:11"/);
     assert.match(code, /class: "plain",\s*"data-pre-style-from": "src\/App\.tsx:12:15"/);
     assert.equal((code.match(/data-pre-style-/g) ?? []).length, 3);
-    assert.doesNotMatch(await transformed({}), /data-pre-style-/);
-    assert.doesNotMatch(await transformed({ devtools: true, sourceMap: false }), /data-pre-style-/);
+    assert.doesNotMatch(await transformed({ sourceAttributes: false }), /data-pre-style-/);
+    assert.doesNotMatch(
+      await transformed({ sourceAttributes: true, sourceMap: false }),
+      /data-pre-style-/,
+    );
+    // Test runs (Vitest's mode) only have them when asked for.
+    assert.doesNotMatch(await transformed({}, 'test'), /data-pre-style-/);
+    assert.match(await transformed({ sourceAttributes: true }, 'test'), /data-pre-style-at/);
   });
 
-  test('with `devtools`, class attributes in Astro components say where they are written', async () => {
+  test('class attributes in Astro components say where they are written', async () => {
     // Writes `Card.astro` the way Astro's compiler does, as far as this test
     // needs, with a source map like its own: each attribute and prop maps to
     // where it starts.
@@ -701,8 +708,8 @@ describe('dev', () => {
       },
     };
     const server = await createServer({
-      ...config('jsx', { devtools: true }),
-      plugins: [...config('jsx', { devtools: true }).plugins!, compileAstro],
+      ...config('jsx', {}),
+      plugins: [...config('jsx', {}).plugins!, compileAstro],
       server: { middlewareMode: true, ws: false },
     });
     try {
@@ -735,7 +742,7 @@ describe('dev', () => {
       assert.equal(version, 1);
       assert.equal(editor, '/__open-in-editor');
       assert.equal(root, fixture('basic'));
-      assert.equal(classAttributes, false);
+      assert.equal(classAttributes, true);
       assert.equal(rules.length, 1);
       assert.equal(rules[0].className, className);
       assert.equal(rules[0].sources[0].file, `${fixture('basic')}/src/main.ts`);

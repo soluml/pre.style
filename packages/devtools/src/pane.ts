@@ -123,7 +123,7 @@ function usedAt(selected: Selected, usages: Usages): HTMLElement | null {
       element(
         'span',
         'used-at-off',
-        'To link to the line that sets this element’s classes, turn on @pre.style/vite’s devtools option.',
+        'To link to the line that sets this element’s classes, turn on @pre.style/vite’s sourceAttributes option. It’s on by default in dev, except in test runs.',
       ),
     );
     return section('Class attribute', [box]);
