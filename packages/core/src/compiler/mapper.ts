@@ -10,12 +10,12 @@
 //   "contentMappers": [{ "package": "@pre.style/core", "extensions": [".css", ".scss"] }]
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { PreStyleError } from './block.ts';
 import { createCompiler } from './compiler.ts';
-import type { Compiler, PrependFiles } from './compiler.ts';
+import type { Compiler } from './compiler.ts';
 import { readConfig } from './config.ts';
-import { findLibraries } from './libraries.ts';
+import { configFiles, findLibraries } from './libraries.ts';
 import { isIdentifier } from './stylesheet.ts';
 
 interface Request {
@@ -29,11 +29,6 @@ const projects = new Map<string, Promise<Compiler>>();
 
 // Diagnostic codes, for errors in a stylesheet file.
 const INVALID_STYLESHEET = 9001;
-
-const prependPaths = (dir: string, files: PrependFiles | undefined) =>
-  (Array.isArray(files) ? files : [...(files?.css ?? []), ...(files?.scss ?? [])]).map((file) =>
-    resolve(dir, file),
-  );
 
 async function openProject(params: {
   configFileName: string;
@@ -60,16 +55,11 @@ async function openProject(params: {
     warn: () => {},
   });
   projects.set(params.projectHandle, compiler);
-  await compiler;
 
   // Changes to these files change which classes files export.
   const watchedFiles = [
-    join(app.dir, 'package.json'),
-    ...prependPaths(app.dir, app.config.prependFiles),
-    ...libraries.flatMap(({ dir, prependFiles }) => [
-      join(dir, 'package.json'),
-      ...prependPaths(dir, prependFiles),
-    ]),
+    ...configFiles(app.dir, libraries),
+    ...(await compiler).prependFiles(),
   ].filter((file) => existsSync(file));
   const hash = createHash('sha256');
   for (const file of watchedFiles) hash.update(`${file}\0${readFileSync(file, 'utf8')}\0`);
