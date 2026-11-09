@@ -4,7 +4,60 @@
   box-sizing: border-box;
 }
 
+* {
+  font: inherit;
+  margin: 0;
+  padding: 0;
+}
+
 :root {
+  --grid: 1.5;
+
+  color-scheme: dark light;
+  hanging-punctuation: first last;
   height: 100%;
   width: 100%;
+}
+
+body {
+  line-height: var(--grid);
+  min-height: 100%;
+  min-height: max(100svh, 100%);
+  overflow: clip auto;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :has(:target) {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(1rem * var(--grid));
+  }
+}
+
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+:is([data-box], #a) {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  height: calc-size(auto, round(up, size, 1rem * var(--grid)));
+  width: calc-size(auto, round(down, size, 1rem * var(--grid)));
 }
