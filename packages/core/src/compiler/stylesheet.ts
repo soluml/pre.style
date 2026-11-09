@@ -5,6 +5,7 @@ import {
   addDeclarations,
   addGlobal,
   dropOverridden,
+  pruneFallbacks,
   key,
   parseRules,
   PreStyleError,
@@ -230,7 +231,8 @@ export function parseStylesheet(
     }
   }
 
-  for (const target of classes.values()) target.atoms = dropOverridden(target.atoms);
+  for (const target of classes.values())
+    target.atoms = dropOverridden(pruneFallbacks(target.atoms, options.lightningcss));
   // Custom properties are local to the whole file, like keyframes.
   if (options.customPropertyLocalization) {
     const all = [...classes.values()].flatMap((target) => target.atoms);

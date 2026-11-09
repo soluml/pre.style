@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Rule } from 'lightningcss';
-import { key, overrideKey, parseRules, valueOf, walk } from './block.ts';
+import { atomDeclaration, key, overrideKey, parseRules, valueOf, walk } from './block.ts';
 import type { Atom, GlobalRule, Lang, ParsedBlock, ParseOptions } from './block.ts';
 import { VARIABLE_PREFIX } from './variables.ts';
 
@@ -118,7 +118,7 @@ export function localizeCustomProperties(
     const hash = createHash('sha256').update(`${scope}\n${name}`).digest('base64url').slice(0, 16);
     local.set(name, VARIABLE_PREFIX + hash);
   };
-  for (const atom of atoms) eachDeclared(atom.declaration.value, declared);
+  for (const atom of atoms) eachDeclared(atom.declaration.values, declared);
   const own = (global: GlobalRule) => !shared.keys.has(global.key);
   for (const global of globals) if (own(global)) eachDeclared(global.rule, declared);
   if (local.size === 0) return { globals, atoms: (list) => list };
@@ -137,23 +137,19 @@ export function localizeCustomProperties(
     }),
     atoms: (list) =>
       list.map((atom) => {
-        const value = rename(atom.declaration.value, local);
+        const values = rename(atom.declaration.values, local);
         const atRules = atom.atRules.map((segment) => {
           const rule = rename(segment.rule, local);
           return rule === segment.rule ? segment : { key: key(valueKey(rule)), rule };
         });
         const unchanged =
-          value === atom.declaration.value && atRules.every((s, i) => s === atom.atRules[i]);
+          values === atom.declaration.values && atRules.every((s, i) => s === atom.atRules[i]);
         if (unchanged) return atom;
         return {
           ...atom,
           atRules,
           property: local.get(atom.property) ?? atom.property,
-          declaration: {
-            ...atom.declaration,
-            key: key(value) + (atom.declaration.important ? '!' : ''),
-            value,
-          },
+          declaration: atomDeclaration(values, atom.declaration.important),
         };
       }),
   };

@@ -68,6 +68,13 @@ describe('stylesheet files', () => {
     );
   });
 
+  test('declarations of the same property are kept as fallbacks', async () => {
+    const { css: output } = await compileSheet(`.box { height: 100%; height: 100svh; }`, {
+      options: { lightningcss: { targets: { chrome: 100 << 16, safari: 14 << 16 } } },
+    });
+    assert.equal(output, '.A{height:100%;height:100svh}');
+  });
+
   test('classes are exported in the order they first appear', async () => {
     const { names } = await compileSheet(
       `.b { color: red; } .a { color: blue; } .b:hover { color: green; }`,
