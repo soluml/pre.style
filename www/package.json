@@ -27,6 +27,11 @@
     "include": [
       "src/**/*.{ts,tsx,astro}"
     ],
+    "prependFiles": {
+      "scss": [
+        "src/layouts/_mixins.scss"
+      ]
+    },
     "keyframeLocalization": true
   }
 }

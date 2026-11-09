@@ -12,6 +12,7 @@
 
 :root {
   --grid: 1.5;
+  --gap: calc(1rem * var(--grid));
 
   color-scheme: dark light;
   hanging-punctuation: first last;
@@ -30,7 +31,7 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   :has(:target) {
     scroll-behavior: smooth;
-    scroll-padding-top: calc(1rem * var(--grid));
+    scroll-padding-top: var(--gap);
   }
 }
 
@@ -53,11 +54,4 @@ h6 {
 
 p {
   text-wrap: pretty;
-}
-
-:is([data-box], #a) {
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  height: calc-size(auto, round(up, size, 1rem * var(--grid)));
-  width: calc-size(auto, round(down, size, 1rem * var(--grid)));
 }

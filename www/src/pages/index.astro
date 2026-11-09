@@ -6,10 +6,10 @@ import Logo from '../img/wordmark.svg';
 const hero = css`
   display: grid;
   place-items: center;
-  padding: 2rem 1rem;
+  margin: auto;
   text-align: center;
   max-width: 41rem;
-  padding: 1rem;
+  padding: 1.5rem 1.rem;
 `;
 
 
@@ -175,7 +175,7 @@ const link = css`
   title="pre.style: zero-runtime CSS-in-JS"
   description="Write plain CSS or SCSS next to your markup, and pre.style compiles it at build time into atomic CSS classes. Docs coming soon."
 >
-  <main class={hero} data-box>
+  <div class={hero}>
     <h1 class={css`margin: 0;`}>
       <span class={visuallyHidden}>pre.style</span>
       <Logo class={logo} aria-hidden="true" focusable="false" />
@@ -211,7 +211,7 @@ const link = css`
       &bull;
       <a class={link} href="https://www.npmjs.com/package/@pre.style/core">npm</a>
     </p>
-  </main>
+  </div>
 </Layout>
 
 <script>

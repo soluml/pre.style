@@ -46,6 +46,14 @@ const body = scss`
   //   100% { opacity: 1; }
   // }
 `;
+
+const header = scss`
+  @include box-grid;
+
+  border: 1px solid currentColor;
+`
+
+
 ---
 
 <!doctype html>
@@ -60,6 +68,7 @@ const body = scss`
     <Font cssVariable="--font-geist" preload />
   </head>
   <body class={body}>
-    <slot />
+    <header class={header}>ASDASD</header>
+    <main hidden><slot /></main>
   </body>
 </html>

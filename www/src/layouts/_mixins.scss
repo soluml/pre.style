@@ -1,0 +1,8 @@
+@mixin box-grid($dir: up, $property: "height") {
+  @if $property == "both" {
+    @include box-grid($dir, "height");
+    @include box-grid($dir, "width");
+  } @else {
+    #{$property}: calc-size(auto, round($dir, size, var(--gap)));
+  }
+}
