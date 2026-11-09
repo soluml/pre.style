@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Rule } from 'lightningcss';
-import { key, overrideKey, valueOf } from './block.ts';
+import { atomDeclaration, key, overrideKey, valueOf } from './block.ts';
 import type { Atom, GlobalRule } from './block.ts';
 
 // With `keyframeLocalization`, each `@keyframes` name is replaced with a
@@ -65,16 +65,9 @@ export function localizeKeyframes(globals: GlobalRule[]): {
     atoms: (atoms) =>
       atoms.map((atom) => {
         if (!ANIMATION_PROPERTIES.has(atom.property.replace(/^-\w+-/, ''))) return atom;
-        const value = renameIdents(atom.declaration.value, local);
-        if (value === atom.declaration.value) return atom;
-        return {
-          ...atom,
-          declaration: {
-            ...atom.declaration,
-            key: key(value) + (atom.declaration.important ? '!' : ''),
-            value,
-          },
-        };
+        const values = renameIdents(atom.declaration.values, local);
+        if (values === atom.declaration.values) return atom;
+        return { ...atom, declaration: atomDeclaration(values, atom.declaration.important) };
       }),
   };
 }

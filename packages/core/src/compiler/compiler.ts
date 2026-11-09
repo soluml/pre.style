@@ -3,7 +3,7 @@ import { dirname, relative, resolve as resolvePath, sep } from 'node:path';
 import { transform } from 'lightningcss';
 import type { Rule, SelectorList } from 'lightningcss';
 import SweatMap from 'sweatmap';
-import { dropOverridden, parseBlock, PreStyleError, valueOf } from './block.ts';
+import { atomDeclaration, dropOverridden, parseBlock, PreStyleError, valueOf } from './block.ts';
 import type {
   Atom,
   AtRuleSegment,
@@ -781,12 +781,12 @@ export class Compiler {
 
   #atomRule(record: AtomRecord, loc: unknown): Rule {
     const { atom } = record;
-    const value = hasGenerated(atom.declaration.key)
-      ? this.#named(atom.declaration.value)
-      : atom.declaration.value;
+    const values = hasGenerated(atom.declaration.key)
+      ? this.#named(atom.declaration.values)
+      : atom.declaration.values;
     const declarations = atom.declaration.important
-      ? { importantDeclarations: [value] }
-      : { declarations: [value] };
+      ? { importantDeclarations: values }
+      : { declarations: values };
     return {
       type: 'style',
       value: { selectors: this.#atomSelectors(record), declarations, rules: [], loc },
@@ -813,6 +813,20 @@ export class Compiler {
     return emit(this.#atomGroups());
   }
 
+  // An atom's rule as text. Without the user's targets, Lightning CSS would
+  // drop a stack's fallbacks, so each declaration is printed on its own.
+  #printedStack(record: AtomRecord, rule: Rule, text: (rule: Rule) => string): string {
+    const code = text(rule);
+    const { values, important } = record.atom.declaration;
+    if (values.length === 1) return code;
+    const lines = values.map((value) => {
+      const atom = { ...record.atom, declaration: atomDeclaration([value], important) };
+      const own = text(this.#atomRule({ ...record, atom }, valueOf(rule).loc));
+      return own.slice(own.indexOf(' {\n') + 3, own.lastIndexOf('\n}'));
+    });
+    return `${code.slice(0, code.indexOf(' {\n'))} {\n${lines.join('\n')}\n}`;
+  }
+
   #usage(record: AtomRecord, order: number): ClassUsage {
     const { atom } = record;
     const loc = { source_index: 0, line: 0, column: 1 };
@@ -821,7 +835,7 @@ export class Compiler {
     const { drafts, nonStandard, errorRecovery } = this.#parseOptions.lightningcss;
     const text = (rules: Rule) =>
       print([rules], [], { drafts, nonStandard, errorRecovery }, false).code;
-    const code = (record.printed ??= text(rule));
+    const code = (record.printed ??= this.#printedStack(record, rule, text));
     const open = code.indexOf(' {\n');
     return {
       className: record.className!,
@@ -835,7 +849,9 @@ export class Compiler {
       declaration: code
         .slice(open + 3, code.lastIndexOf('\n}'))
         .trim()
-        .replace(/;$/, ''),
+        .replace(/;$/, '')
+        // Fallbacks, on one line.
+        .replaceAll(/;\n\s*/g, '; '),
       property: this.#propertyName(atom.property),
       covers: Object.hasOwn(SHORTHANDS, atom.property) ? SHORTHANDS[atom.property] : [],
       important: atom.declaration.important,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { transform } from 'lightningcss';
-import type { Declaration, Rule } from 'lightningcss';
-import { key, overrideKey, PreStyleError, valueOf } from './block.ts';
+import type { Rule } from 'lightningcss';
+import { atomDeclaration, key, overrideKey, PreStyleError, valueOf } from './block.ts';
 import type { Atom, GlobalRule, Position } from './block.ts';
 import { atRuleInfo } from './at-rules.ts';
 import { SLOT_PREFIX } from './interpolate.ts';
@@ -65,7 +65,8 @@ const IGNORED = (token: { type: string; value?: { type?: string } }) =>
 // variant, the generated class would have to be too, so those use a variable.
 function directSlot(atom: Atom): VarNode | null {
   if (atom.atRules.length > 0 || atom.variant !== null || atom.declaration.important) return null;
-  const declaration = atom.declaration.value as Declaration;
+  if (atom.declaration.values.length !== 1) return null;
+  const declaration = atom.declaration.values[0];
   // Lightning CSS also uses `custom` for properties it doesn't parse, such as
   // `content` with a `var()`.
   if (declaration.property !== 'custom' || !atom.property.startsWith('--')) return null;
@@ -321,22 +322,17 @@ export function extractVariables(
       }
       continue;
     }
-    const value = structuredClone(atom.declaration.value);
+    const values = structuredClone(atom.declaration.values);
     const selector = selectorOf(atom);
     let index = 0;
-    eachSlot(value, (node) => {
+    // Counted across the whole stack, so `height: ${a}; height: ${b}` is two
+    // variables.
+    eachSlot(values, (node) => {
       const { slot, syntax } = parseSlot(node);
       const identity = atomIdentity(atom, index++);
       useVariable(node, identity, slot, syntax, variables, added, atom.position, selector);
     });
-    keptAtoms.push({
-      ...atom,
-      declaration: {
-        ...atom.declaration,
-        key: key(value) + (atom.declaration.important ? '!' : ''),
-        value,
-      },
-    });
+    keptAtoms.push({ ...atom, declaration: atomDeclaration(values, atom.declaration.important) });
   }
   return { atoms: keptAtoms, globals: [...kept, ...added.values()], variables };
 }

@@ -150,6 +150,20 @@ describe('runtime values', () => {
     );
   });
 
+  test('a value after a fallback replaces it, since a `var()` always parses', async () => {
+    const { css } = await compile(block`height: 100%; height: ${'h'};`);
+    assert.match(css, /^\.A\{height:var\(--A\)\}$/m);
+  });
+
+  test('a value before a fallback is kept', async () => {
+    const { css, variables } = await compile(block`height: ${'h'}; height: 100svh;`);
+    assert.match(css, /\.A\{height:var\(--A\);height:100svh\}/);
+    assert.deepEqual(
+      variables[0].map((v) => v.slot.expressions),
+      [[0]],
+    );
+  });
+
   test('a shorthand stays one class', async () => {
     const { classes, css } = await compile(block`margin: ${'m'}px;`);
     assert.equal(classes[0], 'A');

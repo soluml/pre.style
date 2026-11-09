@@ -922,12 +922,39 @@ Expanding means some shorthands produce many classes. For example, `font` also r
 
 ### Order
 
-Within one block, a later declaration overrides an earlier one, as in plain CSS. Across blocks, the CSS file is ordered so the usual rules hold:
+Within one block, a later declaration overrides an earlier one, as in plain CSS (see [Fallbacks](#fallbacks) for the same property twice in a row). Across blocks, the CSS file is ordered so the usual rules hold:
 
 1. Hoisted at-rules (`@layer` statements, `@import`, `@namespace`), then other copied at-rules. With the `layer` option, everything but `@import` and `@namespace` is inside the layer.
 2. Classes on the element.
 3. Selector variants, with pseudo-classes in LVHFA order (`:link`, `:visited`, `:hover`, `:focus`, `:active`).
 4. At-rule groups. `@media` queries with only a `min-width` come last, smallest first (mobile-first).
+
+### Fallbacks
+
+Declaring the same property more than once in a rule keeps the earlier values as fallbacks, for browsers that can't parse the later ones. They stay together in one class:
+
+```ts
+css`
+  height: 100%;
+  height: 100svh;
+`;
+```
+
+```css
+.A {
+  height: 100%;
+  height: 100svh;
+}
+```
+
+Lightning CSS drops the fallbacks your [`targets`](#configuration) don't need, so set `targets` to keep them. Without `targets`, it assumes current browsers and writes only `height: 100svh` (which then shares a class with any other `height: 100svh`). Values it can't parse, such as `calc-size()`, always keep their fallbacks.
+
+A few things aren't fallbacks:
+
+- **A declaration in another rule**, such as `height: 100%; & { height: 100svh; }`, overrides the earlier one, since separate rules become separate classes.
+- **A value with `var()`, `env()`, or `${…}`** replaces the declarations before it. Browsers only check these values when they're used, so they never fall back: an invalid value, or a `${…}` that is `null`, makes the property `unset`. To fall back from `${…}`, use a default (`height: var(${h}, 100%)`). A `${…}` followed by a static value is a real fallback (`height: ${h}; height: 100svh`).
+- **Custom properties**, which accept any value.
+- **Shorthands** are expanded into longhands, so `background: red; background: linear-gradient(…)` loses the `red`: the gradient's `background-color` (transparent) is a valid value in every browser.
 
 ## Compared to utility-first frameworks
 
