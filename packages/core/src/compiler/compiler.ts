@@ -3,7 +3,7 @@ import { dirname, relative, resolve as resolvePath, sep } from 'node:path';
 import { transform } from 'lightningcss';
 import type { Rule, SelectorList } from 'lightningcss';
 import SweatMap from 'sweatmap';
-import { dropOverridden, parseBlock, PreStyleError, valueOf } from './block.ts';
+import { atomDeclaration, dropOverridden, parseBlock, PreStyleError, valueOf } from './block.ts';
 import type {
   Atom,
   AtRuleSegment,
@@ -222,10 +222,10 @@ export class Compiler {
   readonly #options: CompilerOptions;
   // Prepended code for the app's blocks, and for each library's, with the
   // most deeply nested library first.
-  readonly #prepend: Record<Lang, string>;
+  readonly #prepend: Prepended;
   readonly #libraries: {
     dir: string;
-    prepend: Record<Lang, string>;
+    prepend: Prepended;
     keyframeLocalization: boolean;
     customPropertyLocalization: boolean;
   }[];
@@ -353,9 +353,10 @@ export class Compiler {
     });
   }
 
-  // The files a block's class string depends on, through `composes … from`.
+  // The files a block's class string depends on: its prepended files, and
+  // files it composes from.
   dependencies(block: Block): string[] {
-    const dependencies: string[] = [];
+    const dependencies = [...this.#library(block.file).prependFiles[block.lang]];
     this.#resolveBlock(block, this.#parse(block), dependencies);
     return [...new Set(dependencies)];
   }
@@ -407,10 +408,47 @@ export class Compiler {
         if (source.file === file) record.sources.delete(key);
   }
 
+  // Every prepended file, the app's and each library's, as absolute paths.
+  prependFiles(): string[] {
+    return [...new Set(this.#prepends().flatMap(({ files: { css, scss } }) => [...css, ...scss]))];
+  }
+
+  // Call when a file changes. Drops the places it uses atoms (see
+  // `forgetSources`) and, if it's a prepended file, reads it again, so blocks
+  // and stylesheet files compiled after this use its new code. Returns whether
+  // it was a prepended file.
+  fileChanged(file: string): boolean {
+    this.forgetSources(file);
+    let changed = false;
+    for (const prepended of this.#prepends()) {
+      if (![...prepended.files.css, ...prepended.files.scss].includes(file)) continue;
+      try {
+        prepended.code = readPrependCode(prepended.files);
+      } catch (error) {
+        // Kept as it was, until the file can be read again.
+        this.#parseOptions.warn(
+          `Can't read ${file}, a prepended file, so blocks use its last contents: ${(error as Error).message}`,
+        );
+        continue;
+      }
+      changed = true;
+    }
+    if (changed) {
+      // Parsed with the old code. Cache keys hold the code they parsed, but
+      // not the code prepended to it.
+      this.#blocks.clear();
+      this.#stylesheets.clear();
+    }
+    return changed;
+  }
+
   // Each class of a stylesheet file, with its class string.
   stylesheet(sheet: Stylesheet): CompiledStylesheet {
     const parsed = this.#parseSheet(sheet);
-    const dependencies = [...parsed.dependencies];
+    const dependencies = [
+      ...this.#library(sheet.file).prependFiles[sheet.lang],
+      ...parsed.dependencies,
+    ];
     const exports: CompiledStylesheet['exports'] = [];
     for (const name of parsed.classes.keys())
       exports.push([
@@ -485,9 +523,18 @@ export class Compiler {
     return variables;
   }
 
+  // The app's prepended files, then each library's.
+  #prepends(): Prepended[] {
+    return [this.#prepend, ...this.#libraries.map((library) => library.prepend)];
+  }
+
   // A library's blocks and files get its prepended files and keyframes
   // setting instead of the app's.
-  #library(file: string | undefined): { library: number; options: ParseOptions } {
+  #library(file: string | undefined): {
+    library: number;
+    options: ParseOptions;
+    prependFiles: Record<Lang, string[]>;
+  } {
     const library =
       file === undefined ? -1 : this.#libraries.findIndex(({ dir }) => file.startsWith(dir));
     const { prepend, keyframeLocalization, customPropertyLocalization } =
@@ -500,9 +547,10 @@ export class Compiler {
         : this.#libraries[library];
     return {
       library,
+      prependFiles: prepend.files,
       options: {
         ...this.#parseOptions,
-        prepend,
+        prepend: prepend.code,
         keyframeLocalization: keyframeLocalization ?? false,
         customPropertyLocalization: customPropertyLocalization ?? false,
       },
@@ -781,12 +829,12 @@ export class Compiler {
 
   #atomRule(record: AtomRecord, loc: unknown): Rule {
     const { atom } = record;
-    const value = hasGenerated(atom.declaration.key)
-      ? this.#named(atom.declaration.value)
-      : atom.declaration.value;
+    const values = hasGenerated(atom.declaration.key)
+      ? this.#named(atom.declaration.values)
+      : atom.declaration.values;
     const declarations = atom.declaration.important
-      ? { importantDeclarations: [value] }
-      : { declarations: [value] };
+      ? { importantDeclarations: values }
+      : { declarations: values };
     return {
       type: 'style',
       value: { selectors: this.#atomSelectors(record), declarations, rules: [], loc },
@@ -813,6 +861,20 @@ export class Compiler {
     return emit(this.#atomGroups());
   }
 
+  // An atom's rule as text. Without the user's targets, Lightning CSS would
+  // drop a stack's fallbacks, so each declaration is printed on its own.
+  #printedStack(record: AtomRecord, rule: Rule, text: (rule: Rule) => string): string {
+    const code = text(rule);
+    const { values, important } = record.atom.declaration;
+    if (values.length === 1) return code;
+    const lines = values.map((value) => {
+      const atom = { ...record.atom, declaration: atomDeclaration([value], important) };
+      const own = text(this.#atomRule({ ...record, atom }, valueOf(rule).loc));
+      return own.slice(own.indexOf(' {\n') + 3, own.lastIndexOf('\n}'));
+    });
+    return `${code.slice(0, code.indexOf(' {\n'))} {\n${lines.join('\n')}\n}`;
+  }
+
   #usage(record: AtomRecord, order: number): ClassUsage {
     const { atom } = record;
     const loc = { source_index: 0, line: 0, column: 1 };
@@ -821,7 +883,7 @@ export class Compiler {
     const { drafts, nonStandard, errorRecovery } = this.#parseOptions.lightningcss;
     const text = (rules: Rule) =>
       print([rules], [], { drafts, nonStandard, errorRecovery }, false).code;
-    const code = (record.printed ??= text(rule));
+    const code = (record.printed ??= this.#printedStack(record, rule, text));
     const open = code.indexOf(' {\n');
     return {
       className: record.className!,
@@ -835,7 +897,9 @@ export class Compiler {
       declaration: code
         .slice(open + 3, code.lastIndexOf('\n}'))
         .trim()
-        .replace(/;$/, ''),
+        .replace(/;$/, '')
+        // Fallbacks, on one line.
+        .replaceAll(/;\n\s*/g, '; '),
       property: this.#propertyName(atom.property),
       covers: Object.hasOwn(SHORTHANDS, atom.property) ? SHORTHANDS[atom.property] : [],
       important: atom.declaration.important,
@@ -899,14 +963,28 @@ function layerRule(layer: false | string | undefined): Rule | null {
 // A stylesheet file, for positions and source maps.
 const fileBlock = (file: string): Block => ({ code: '', lang: 'css', file, line: 1, column: 1 });
 
-// Reads prepended files, relative to `dir`, once.
-function readPrepend(dir: string, files: PrependFiles | undefined): Record<Lang, string> {
-  const read = (list: string[] = []) =>
-    list.map((file) => readFileSync(resolvePath(dir, file), 'utf8')).join('\n');
-  return Array.isArray(files)
-    ? { css: read(files), scss: read(files) }
-    : { css: read(files?.css), scss: read(files?.scss) };
+// Prepended files, as absolute paths, and their code for each block type.
+// The code is read again by `fileChanged`.
+interface Prepended {
+  files: Record<Lang, string[]>;
+  code: Record<Lang, string>;
 }
+
+// Reads prepended files, relative to `dir`.
+function readPrepend(dir: string, files: PrependFiles | undefined): Prepended {
+  const resolve = (list: string[] = []) => list.map((file) => resolvePath(dir, file));
+  const paths = Array.isArray(files)
+    ? { css: resolve(files), scss: resolve(files) }
+    : { css: resolve(files?.css), scss: resolve(files?.scss) };
+  return { files: paths, code: readPrependCode(paths) };
+}
+
+const readFiles = (files: string[]) => files.map((file) => readFileSync(file, 'utf8')).join('\n');
+
+const readPrependCode = (files: Record<Lang, string[]>): Record<Lang, string> => ({
+  css: readFiles(files.css),
+  scss: readFiles(files.scss),
+});
 
 const count = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
 

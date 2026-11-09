@@ -129,3 +129,10 @@ export function findLibraries(
   for (const name of names) visit(name, root);
   return libraries;
 }
+
+// The package.json files whose `pre.style` fields configure the compiler: the
+// app's and each library's.
+export const configFiles = (appDir: string, libraries: { dir: string }[]): string[] => [
+  join(appDir, 'package.json'),
+  ...libraries.map(({ dir }) => join(dir, 'package.json')),
+];

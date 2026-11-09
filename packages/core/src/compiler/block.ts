@@ -12,6 +12,7 @@ import { localizeCustomProperties } from './custom-properties.ts';
 import { SLOT_PREFIX } from './interpolate.ts';
 import { localizeKeyframes } from './keyframes.ts';
 import { compose, fromPlaceholder, isElement, PLACEHOLDER, repair } from './selectors.ts';
+import { print } from './print.ts';
 import { splitBlock } from './split.ts';
 import { extractVariables } from './variables.ts';
 import type { Variable } from './variables.ts';
@@ -42,13 +43,30 @@ export interface AtRuleSegment {
 export interface Atom {
   atRules: AtRuleSegment[];
   variant: { key: string; selectors: SelectorList } | null;
-  declaration: { key: string; value: Declaration; important: boolean };
+  // Usually one declaration. Declarations that set the same property in one
+  // declaration list are kept together, in order, as fallbacks (`height:
+  // 100%; height: 100svh`): a browser that can't parse the last one uses an
+  // earlier one, which only works in the same rule.
+  declaration: AtomDeclaration;
   // The property the declaration sets, and whether it's a shorthand that
   // couldn't be expanded.
   property: string;
   shorthand: boolean;
   position: Position | null;
 }
+
+export interface AtomDeclaration {
+  key: string;
+  values: Declaration[];
+  important: boolean;
+}
+
+// An atom's declaration. A single declaration's key is its own key.
+export const atomDeclaration = (values: Declaration[], important: boolean): AtomDeclaration => ({
+  key: key(values.length === 1 ? values[0] : values) + (important ? '!' : ''),
+  values,
+  important,
+});
 
 export interface GlobalRule {
   key: string;
@@ -208,7 +226,7 @@ export function parseBlock(code: string, lang: Lang, options: ParseOptions): Par
     walk(rules, [], null, parsed, position),
   );
 
-  let atoms = dropOverridden(parsed.atoms);
+  let atoms = dropOverridden(pruneFallbacks(parsed.atoms, options.lightningcss));
   let { globals } = parsed;
   if (options.customPropertyLocalization) {
     const local = localizeCustomProperties(atoms, globals, `block\n${code}`, lang, options);
@@ -255,6 +273,60 @@ export function parseRules(
       { cause: error },
     );
   }
+}
+
+// Drops the fallbacks in each stack that Lightning CSS wouldn't print for the
+// user's targets, so a stack that collapses to one declaration shares its
+// class. Values Lightning CSS can't parse (such as `calc-size()`) are kept.
+// Printing and parsing back changes some values' trees, so the round trip
+// only decides which of the original declarations are kept.
+export function pruneFallbacks(atoms: Atom[], lightningcss: LightningOptions): Atom[] {
+  if (atoms.every((atom) => atom.declaration.values.length === 1)) return atoms;
+  const { visitor: _visitor, minify: _minify, ...options } = lightningcss;
+  // The stack as Lightning CSS prints it, parsed back, as keys. Declarations
+  // it adds for other properties (vendor prefixes) are left out.
+  const printed = (stack: Declaration[], important: boolean, property: string) => {
+    const block = important ? { importantDeclarations: stack } : { declarations: stack };
+    const rule = {
+      type: 'style',
+      value: {
+        selectors: [[{ type: 'class', name: 'x' }]],
+        declarations: block,
+        rules: [],
+        loc: { source_index: 0, line: 0, column: 1 },
+      },
+    } as unknown as Rule;
+    let values: Declaration[] = [];
+    parseRules(
+      print([rule], [], options, false).code,
+      options,
+      () => null,
+      (rules) => {
+        const parsed = valueOf(rules[0]).declarations ?? {};
+        values = (important ? parsed.importantDeclarations : parsed.declarations) ?? [];
+      },
+    );
+    return values.filter((value) => propertyOf(value).property === property).map(key);
+  };
+  return atoms.map((atom) => {
+    const { values: stack, important } = atom.declaration;
+    if (stack.length === 1) return atom;
+    let kept: Declaration[];
+    try {
+      const remaining = printed(stack, important, atom.property);
+      if (remaining.length === stack.length) return atom;
+      kept = stack.filter((value) => {
+        const own = printed([value], important, atom.property).at(-1);
+        if (own !== remaining[0]) return false;
+        remaining.shift();
+        return true;
+      });
+    } catch {
+      return atom;
+    }
+    if (kept.length === 0) return atom;
+    return { ...atom, declaration: atomDeclaration(kept, important) };
+  });
 }
 
 // Within a block, a later declaration overrides an earlier one that sets the
@@ -387,23 +459,46 @@ export function addDeclarations(
     for (const d of normal.slice(0, own)) composes.push(parseComposes(d, position));
     normal = normal.slice(own);
   }
+  // Declarations of the same property in this list are stacked, in order, as
+  // fallbacks, at the place of the last one. A declaration that always parses
+  // replaces the stack, since nothing before it can ever apply.
   const add = (declarations: Declaration[] = [], important: boolean) => {
+    const stacks = new Map<string, Declaration[]>();
+    const list: { property: string; shorthand: boolean; values: Declaration[] }[] = [];
     for (const declaration of declarations) {
       for (const value of expand(declaration)) {
         const { property, shorthand } = propertyOf(value);
-        atoms.push({
-          atRules,
-          variant,
-          declaration: { key: key(value) + (important ? '!' : ''), value, important },
-          property,
-          shorthand,
-          position,
-        });
+        const stack = stacks.get(property);
+        if (stack)
+          list.splice(
+            list.findIndex((item) => item.values === stack),
+            1,
+          );
+        const values = stack && !alwaysParses(value, property) ? [...stack, value] : [value];
+        stacks.set(property, values);
+        list.push({ property, shorthand, values });
       }
     }
+    for (const { property, shorthand, values } of list)
+      atoms.push({
+        atRules,
+        variant,
+        declaration: atomDeclaration(values, important),
+        property,
+        shorthand,
+        position,
+      });
   };
   add(normal, false);
   add(block?.importantDeclarations, true);
+}
+
+// Whether a browser always parses a declaration, so it can't fall back to an
+// earlier one: custom properties take any value, and `var()` and `env()`
+// (including `${…}`, which becomes a `var()`) are only checked once they're
+// substituted, when an invalid value makes the property `unset`.
+function alwaysParses(value: Declaration, property: string): boolean {
+  return property.startsWith('--') || /"type":"(?:var|env)"/.test(key(value));
 }
 
 const ident = (t: { type: string; value?: any } | undefined) =>

@@ -16,6 +16,6 @@ export type { Slot } from './interpolate.ts';
 export type { Printed } from './print.ts';
 export { checkField, readConfig } from './config.ts';
 export type { PackageConfig } from './config.ts';
-export { findLibraries } from './libraries.ts';
+export { configFiles, findLibraries } from './libraries.ts';
 export type { LibraryConfig, ResolvedLibrary } from './libraries.ts';
 export { isIdentifier } from './stylesheet.ts';

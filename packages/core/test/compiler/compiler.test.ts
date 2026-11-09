@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Compiler, createCompiler, PreStyleError } from '../../src/compiler/index.ts';
@@ -269,6 +269,9 @@ describe('output order', () => {
   });
 });
 
+// Browsers without `svh` and `oklch()`.
+const OLD_TARGETS = { chrome: 100 << 16, safari: 14 << 16 };
+
 describe('declarations in a block', () => {
   test('later declarations override earlier ones', async () => {
     const { classes, css: output } = await compile([
@@ -291,6 +294,67 @@ describe('declarations in a block', () => {
     const { classes, css: output } = await compile([`color: red !important; color: blue`]);
     assert.deepEqual(classes, ['A']);
     assert.equal(output, '.A{color:red!important}');
+  });
+
+  test('declarations of the same property are kept as fallbacks', async () => {
+    // Targets without `svh`, so Lightning CSS keeps the fallback.
+    const { classes, css: output } = await compile([`height: 100%; width: 1px; height: 100svh;`], {
+      lightningcss: { targets: OLD_TARGETS },
+    });
+    assert.deepEqual(classes, ['B A']);
+    assert.equal(
+      output,
+      css`
+        .B{width:1px}
+        .A{height:100%;height:100svh}
+      `,
+    );
+  });
+
+  test('fallbacks the targets support are dropped, so the class is shared', async () => {
+    const { classes, css: output } = await compile([
+      `height: 100%; height: 100svh;`,
+      `height: 100svh;`,
+    ]);
+    assert.deepEqual(classes, ['A', 'A']);
+    assert.equal(output, '.A{height:100svh}');
+  });
+
+  test("fallbacks for values Lightning CSS can't parse are kept", async () => {
+    const { css: output } = await compile([
+      `width: 100px; width: calc-size(auto, round(down, size, 1rem));`,
+    ]);
+    assert.equal(output, '.A{width:100px;width:calc-size(auto, round(down, size, 1rem))}');
+  });
+
+  test('!important fallbacks are kept', async () => {
+    const { css: output } = await compile([`height: 100% !important; height: 100svh !important;`], {
+      lightningcss: { targets: OLD_TARGETS },
+    });
+    assert.equal(output, '.A{height:100%!important;height:100svh!important}');
+  });
+
+  test('a declaration in another rule overrides instead', async () => {
+    const { css: output } = await compile([`height: 100%; & { height: 100svh; }`], {
+      lightningcss: { targets: OLD_TARGETS },
+    });
+    assert.equal(output, '.A{height:100svh}');
+  });
+
+  test('a declaration that always parses replaces earlier ones', async () => {
+    // `var()` and `env()` are checked only when substituted, so a browser
+    // never falls back from them.
+    const { css: output } = await compile(
+      [`height: 100%; height: var(--x); padding-top: 1px; padding-top: env(safe-area-inset-top);`],
+      { lightningcss: { targets: OLD_TARGETS } },
+    );
+    assert.equal(
+      output,
+      css`
+        .A{height:var(--x)}
+        .B{padding-top:env(safe-area-inset-top)}
+      `,
+    );
   });
 
   test('border stays one class', async () => {
@@ -612,6 +676,52 @@ describe('prependFiles', () => {
       `,
     );
   });
+
+  test("are dependencies of the blocks and stylesheet files they're prepended to", async () => {
+    const compiler = await createCompiler({
+      root: dir,
+      prependFiles: { css: ['vars.css'], scss: ['vars.scss'] },
+    });
+    assert.deepEqual(compiler.dependencies({ code: 'gap: 0', lang: 'css' }), [
+      join(dir, 'vars.css'),
+    ]);
+    assert.deepEqual(compiler.dependencies({ code: 'gap: 0', lang: 'scss' }), [
+      join(dir, 'vars.scss'),
+    ]);
+    const sheet = { code: '.a { gap: 0 }', lang: 'css' as const, file: join(dir, 'a.css') };
+    assert.deepEqual(compiler.stylesheet(sheet).dependencies, [join(dir, 'vars.css')]);
+    assert.deepEqual(compiler.prependFiles(), [join(dir, 'vars.css'), join(dir, 'vars.scss')]);
+  });
+
+  test('fileChanged reads a changed prepended file again', async () => {
+    const own = mkdtempSync(join(tmpdir(), 'pre.style-'));
+    const file = join(own, 'vars.scss');
+    writeFileSync(file, '@mixin box { height: 1px; }');
+    const warnings: string[] = [];
+    const compiler = await createCompiler({
+      root: own,
+      prependFiles: { scss: ['vars.scss'] },
+      lightningcss: { minify: true },
+      warn: (message) => warnings.push(message),
+    });
+    const block = { code: '@include box;', lang: 'scss' as const };
+    compiler.classString(block);
+    assert.match(compiler.css().code, /height:1px/);
+
+    writeFileSync(file, '@mixin box { height: 2px; }');
+    // Other files leave it as it was.
+    assert.equal(compiler.fileChanged(join(own, 'other.ts')), false);
+    assert.equal(compiler.fileChanged(file), true);
+    compiler.classString(block);
+    assert.match(compiler.css().code, /height:2px/);
+
+    // A file that can't be read keeps its last contents, with a warning.
+    rmSync(file);
+    assert.equal(compiler.fileChanged(file), false);
+    assert.match(warnings[0], /Can't read .*vars\.scss/);
+    compiler.classString({ code: '@include box; width: 0;', lang: 'scss' });
+    assert.match(compiler.css().code, /width:0/);
+  });
 });
 
 describe('libraries', () => {
@@ -737,6 +847,22 @@ describe('usages', () => {
         ],
       },
     ]);
+  });
+
+  test('lists every fallback in a stack', async () => {
+    // Printed without the targets, which would drop the fallback.
+    const compiler = await createCompiler({
+      sourceMap: true,
+      lightningcss: { targets: OLD_TARGETS },
+    });
+    const names = compiler
+      .classString(blockIn('/src/A.tsx', 1, 'height: 100%; height: 100svh'))
+      .split(' ');
+    compiler.css();
+    assert.deepEqual(
+      compiler.usages(names).map((usage) => usage.declaration),
+      ['height: 100%; height: 100svh'],
+    );
   });
 
   test('describes selectors, at-rules, and shorthands', async () => {
