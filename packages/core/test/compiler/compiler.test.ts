@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Compiler, createCompiler, PreStyleError } from '../../src/compiler/index.ts';
@@ -675,6 +675,52 @@ describe('prependFiles', () => {
         .A:hover{color:#00f}
       `,
     );
+  });
+
+  test("are dependencies of the blocks and stylesheet files they're prepended to", async () => {
+    const compiler = await createCompiler({
+      root: dir,
+      prependFiles: { css: ['vars.css'], scss: ['vars.scss'] },
+    });
+    assert.deepEqual(compiler.dependencies({ code: 'gap: 0', lang: 'css' }), [
+      join(dir, 'vars.css'),
+    ]);
+    assert.deepEqual(compiler.dependencies({ code: 'gap: 0', lang: 'scss' }), [
+      join(dir, 'vars.scss'),
+    ]);
+    const sheet = { code: '.a { gap: 0 }', lang: 'css' as const, file: join(dir, 'a.css') };
+    assert.deepEqual(compiler.stylesheet(sheet).dependencies, [join(dir, 'vars.css')]);
+    assert.deepEqual(compiler.prependFiles(), [join(dir, 'vars.css'), join(dir, 'vars.scss')]);
+  });
+
+  test('fileChanged reads a changed prepended file again', async () => {
+    const own = mkdtempSync(join(tmpdir(), 'pre.style-'));
+    const file = join(own, 'vars.scss');
+    writeFileSync(file, '@mixin box { height: 1px; }');
+    const warnings: string[] = [];
+    const compiler = await createCompiler({
+      root: own,
+      prependFiles: { scss: ['vars.scss'] },
+      lightningcss: { minify: true },
+      warn: (message) => warnings.push(message),
+    });
+    const block = { code: '@include box;', lang: 'scss' as const };
+    compiler.classString(block);
+    assert.match(compiler.css().code, /height:1px/);
+
+    writeFileSync(file, '@mixin box { height: 2px; }');
+    // Other files leave it as it was.
+    assert.equal(compiler.fileChanged(join(own, 'other.ts')), false);
+    assert.equal(compiler.fileChanged(file), true);
+    compiler.classString(block);
+    assert.match(compiler.css().code, /height:2px/);
+
+    // A file that can't be read keeps its last contents, with a warning.
+    rmSync(file);
+    assert.equal(compiler.fileChanged(file), false);
+    assert.match(warnings[0], /Can't read .*vars\.scss/);
+    compiler.classString({ code: '@include box; width: 0;', lang: 'scss' });
+    assert.match(compiler.css().code, /width:0/);
   });
 });
 

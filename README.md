@@ -759,7 +759,7 @@ Namespace imports still let bundlers drop the classes you don't use. **Remove th
 
 ## Sharing values with prepended files
 
-Use `prependFiles`, in the `pre.style` field of your `package.json`, to add files to the start of every block and stylesheet file, for custom properties, SCSS variables, mixins, and so on. Each file is read once per build.
+Use `prependFiles`, in the `pre.style` field of your `package.json`, to add files to the start of every block and stylesheet file, for custom properties, SCSS variables, mixins, and so on. Each file is read once per build. In dev, saving one updates every block and stylesheet file it's prepended to. Changes to the `pre.style` field itself need a restart of the dev server, which the plugin warns about.
 
 ```json
 {

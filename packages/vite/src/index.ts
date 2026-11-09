@@ -1,10 +1,12 @@
 import { readFile, glob } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { decode } from '@jridgewell/sourcemap-codec';
 import { MagicString } from 'magic-string';
 import { createCn } from '@pre.style/core';
 import type { CnTable } from '@pre.style/core';
 import {
+  configFiles,
   createCompiler,
   findLibraries,
   interpolatedBlock,
@@ -441,6 +443,35 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
     };
   };
 
+  // The compiler is configured once, so a change to a `pre.style` field in
+  // dev is only picked up by a restart. Says so when one changes.
+  const watchConfig = (devServer: ViteDevServer) => {
+    const files = configFiles(app.dir, libraries);
+    const fields = () =>
+      JSON.stringify(
+        files.map((file) => {
+          try {
+            return JSON.parse(readFileSync(file, 'utf8'))['pre.style'] ?? null;
+          } catch {
+            // Mid-edit, or removed. Compared once it's valid again.
+            return undefined;
+          }
+        }),
+      );
+    let last = fields();
+    devServer.watcher.add(files);
+    devServer.watcher.on('change', (file) => {
+      if (!files.includes(file)) return;
+      const next = fields();
+      if (next === last || next.includes('undefined')) return;
+      last = next;
+      config.logger.warn(
+        `[pre.style] The "pre.style" field in ${relative(config.root, file) || file} changed. Restart the dev server to use it.`,
+        { timestamp: true },
+      );
+    });
+  };
+
   const main: Plugin = {
     name: 'pre.style',
     enforce: 'pre',
@@ -477,6 +508,7 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
 
     configureServer(devServer) {
       server = devServer;
+      watchConfig(devServer);
       if (options.sourceMap === false) return;
       // The DevTools extension opens files through Vite's `/__open-in-editor`,
       // whose guess can pick a terminal editor in the dev server's terminal.
@@ -513,9 +545,11 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
 
     // Runs before Vite invalidates the file's modules, which add its current
     // places back as they compile. Once per change, not per transform: an
-    // Astro component's frontmatter and scripts are separate modules.
+    // Astro component's frontmatter and scripts are separate modules. A
+    // prepended file is read again here, and `hotUpdate` updates every module
+    // with blocks it's prepended to.
     watchChange(file) {
-      if (server !== undefined) compiler?.forgetSources(file);
+      if (server !== undefined) compiler?.fileChanged(file);
     },
 
     async buildStart() {

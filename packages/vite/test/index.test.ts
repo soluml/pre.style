@@ -10,7 +10,7 @@ import {
   defaultServerConditions,
 } from 'vite';
 import { MagicString } from 'magic-string';
-import type { InlineConfig, Plugin, Rollup } from 'vite';
+import type { EnvironmentModuleNode, InlineConfig, Plugin, Rollup } from 'vite';
 import preStyle from '../src/index.ts';
 import type { PreStyleOptions } from '../src/index.ts';
 
@@ -626,6 +626,69 @@ describe('dev', () => {
     } finally {
       await server.close();
     }
+  });
+
+  test('changing a prepended file updates the modules with blocks it applies to', async () => {
+    const file = `${fixture('prepend')}/vars.scss`;
+    const original = readFileSync(file, 'utf8');
+    const server = await createServer({
+      ...config('prepend', { lightningcss: { minify: true } }),
+      server: { middlewareMode: true, ws: false },
+    });
+    try {
+      const client = server.environments.client;
+      await client.transformRequest('/src/main.ts');
+      assert.match((await client.transformRequest('/__pre.style.css'))!.code, /color:#639/);
+
+      writeFileSync(file, '$brand: teal;\n');
+      await client.pluginContainer.watchChange(file, { event: 'update' });
+      const plugin = (server.config.plugins as Plugin[]).find((p) => p.name === 'pre.style')!;
+      const hotUpdate = plugin.hotUpdate as (
+        this: unknown,
+        options: { file: string; modules: unknown[] },
+      ) => EnvironmentModuleNode[] | undefined;
+      const affected = hotUpdate.call({ environment: client }, { file, modules: [] });
+      assert.deepEqual(
+        affected?.map((module) => module.id),
+        [`${fixture('prepend')}/src/main.ts`],
+      );
+
+      // Vite invalidates them, and they compile with the new code.
+      for (const module of affected!) client.moduleGraph.invalidateModule(module);
+      await client.transformRequest('/src/main.ts');
+      assert.match((await client.transformRequest('/__pre.style.css'))!.code, /color:teal/);
+    } finally {
+      writeFileSync(file, original);
+      await server.close();
+    }
+  });
+
+  test('changing the pre.style field warns that the dev server needs a restart', async () => {
+    const logged: string[] = [];
+    const logger = createLogger('silent');
+    logger.warn = (message) => logged.push(message);
+    await withField('prepend', { prependFiles: { scss: ['vars.scss'] } }, async () => {
+      const server = await createServer({
+        ...config('prepend', {}),
+        customLogger: logger,
+        server: { middlewareMode: true, ws: false },
+      });
+      const file = `${fixture('prepend')}/package.json`;
+      try {
+        // Other changes to package.json don't warn.
+        const pkg = JSON.parse(readFileSync(file, 'utf8'));
+        writeFileSync(file, JSON.stringify({ ...pkg, version: '1.0.0' }));
+        server.watcher.emit('change', file);
+        assert.deepEqual(logged, []);
+
+        writeFileSync(file, JSON.stringify({ ...pkg, 'pre.style': { quirksMode: true } }));
+        server.watcher.emit('change', file);
+        assert.equal(logged.length, 1);
+        assert.match(logged[0], /"pre\.style" field in package\.json changed\. Restart/);
+      } finally {
+        await server.close();
+      }
+    });
   });
 
   test('the CSS module maps to the blocks by default', async () => {
