@@ -131,11 +131,12 @@ pre {
 }
 
 a {
-  color: currentColor;
+  color: var(--link);
   text-decoration: none;
   text-decoration-skip-ink: auto;
 
   &:where(:hover, :focus-visible) {
+    color: var(--link-active);
     text-decoration: underline;
   }
 }
