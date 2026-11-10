@@ -1,5 +1,6 @@
 import { defineConfig, fontProviders } from 'astro/config';
 import preStyle from '@pre.style/vite';
+import Icons from 'unplugin-icons/vite';
 
 // Unlike the demos, the site uses pre.style's published packages from npm,
 // so it's built the way users build their own sites. It isn't an npm
@@ -40,6 +41,7 @@ export default defineConfig({
       preStyle({
         lightningcss: { minify: true },
       }),
+      Icons({ autoInstall: true, scale: 0, compiler: 'astro' }),
     ],
   },
 });
