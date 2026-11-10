@@ -145,3 +145,11 @@ svg:where(:not([width], [height], [style])) {
   height: 1lh;
   vertical-align: text-bottom;
 }
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}

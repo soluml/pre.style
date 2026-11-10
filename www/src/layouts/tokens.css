@@ -121,51 +121,33 @@
   --red-800: oklch(0.44 0.16 25);
   --red-900: oklch(0.36 0.115 25);
   --red-950: oklch(0.26 0.08 25);
-}
 
-/* ---------- Semantic tokens ---------- */
-:root,
-[data-theme='light'] {
-  color-scheme: light;
-  --bg: oklch(0.975 0.02 85);
-  --bg-grid: oklch(0.9 0.03 80 / 0.55);
-  --surface: oklch(0.992 0.008 85);
-  --surface-2: oklch(0.955 0.022 82);
-  --border: oklch(0.8 0.04 70);
-  --border-strong: oklch(0.3 0.05 45);
-  --text: oklch(0.24 0.055 45);
-  --text-muted: oklch(0.45 0.045 55);
-  --text-faint: oklch(0.6 0.035 65);
-  --accent: var(--brand-500);
-  --accent-text: oklch(0.52 0.15 48);
-  --accent-soft: oklch(0.955 0.05 75);
-  --on-accent: oklch(0.22 0.05 45);
-  --btn-primary-bg: oklch(0.24 0.055 45);
-  --btn-primary-text: oklch(0.975 0.02 85);
-  --code-bg: oklch(0.215 0.02 60);
+  /* ---------- Semantic tokens ---------- */
+  /* Each token is light-dark(<light>, <dark>), resolved by the color-scheme of
+   the element that uses it: the OS preference by default, or data-theme to
+   force one, on the root or any subtree. */
+  --bg: light-dark(oklch(0.975 0.02 85), oklch(0.215 0.022 55));
+  --bg-grid: light-dark(oklch(0.9 0.03 80 / 0.55), oklch(0.32 0.03 55 / 0.55));
+  --surface: light-dark(oklch(0.992 0.008 85), oklch(0.255 0.026 55));
+  --surface-2: light-dark(oklch(0.955 0.022 82), oklch(0.285 0.028 55));
+  --border: light-dark(oklch(0.8 0.04 70), oklch(0.42 0.04 55));
+  --border-strong: light-dark(oklch(0.3 0.05 45), oklch(0.93 0.02 80));
+  --text: light-dark(oklch(0.24 0.055 45), oklch(0.975 0.015 85));
+  --text-muted: light-dark(oklch(0.45 0.045 55), oklch(0.8 0.03 75));
+  --text-faint: light-dark(oklch(0.6 0.035 65), oklch(0.64 0.03 70));
+  --accent: light-dark(var(--brand-500), var(--brand-400));
+  --accent-text: light-dark(oklch(0.52 0.15 48), oklch(0.82 0.17 68));
+  --accent-soft: light-dark(oklch(0.955 0.05 75), oklch(0.32 0.06 62));
+  --on-accent: light-dark(oklch(0.22 0.05 45), oklch(0.2 0.04 50));
+  --btn-primary-bg: light-dark(oklch(0.24 0.055 45), oklch(0.8 0.175 66));
+  --btn-primary-text: light-dark(oklch(0.975 0.02 85), oklch(0.2 0.04 50));
+  --code-bg: light-dark(oklch(0.215 0.02 60), oklch(0.165 0.016 55));
   --code-text: oklch(0.93 0.015 80);
-  --shadow: 0 1px 0 oklch(1 0 0 / 0.6) inset, 0 10px 30px -12px oklch(0.4 0.08 50 / 0.3);
-  --link: oklch(0.5 0.2 295);
-}
-[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: oklch(0.215 0.022 55);
-  --bg-grid: oklch(0.32 0.03 55 / 0.55);
-  --surface: oklch(0.255 0.026 55);
-  --surface-2: oklch(0.285 0.028 55);
-  --border: oklch(0.42 0.04 55);
-  --border-strong: oklch(0.93 0.02 80);
-  --text: oklch(0.975 0.015 85);
-  --text-muted: oklch(0.8 0.03 75);
-  --text-faint: oklch(0.64 0.03 70);
-  --accent: var(--brand-400);
-  --accent-text: oklch(0.82 0.17 68);
-  --accent-soft: oklch(0.32 0.06 62);
-  --on-accent: oklch(0.2 0.04 50);
-  --btn-primary-bg: oklch(0.8 0.175 66);
-  --btn-primary-text: oklch(0.2 0.04 50);
-  --code-bg: oklch(0.165 0.016 55);
-  --code-text: oklch(0.93 0.015 80);
-  --shadow: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 14px 40px -14px oklch(0 0 0 / 0.6);
-  --link: oklch(0.8 0.14 295);
+  /* light-dark() only takes colors, so both themes' drop shadows are
+     listed, with the other theme's left transparent. */
+  --shadow:
+    0 1px 0 light-dark(oklch(1 0 0 / 0.6), oklch(1 0 0 / 0.05)) inset,
+    0 10px 30px -12px light-dark(oklch(0.4 0.08 50 / 0.3), transparent),
+    0 14px 40px -14px light-dark(transparent, oklch(0 0 0 / 0.6));
+  --link: light-dark(oklch(0.5 0.2 295), oklch(0.8 0.14 295));
 }
