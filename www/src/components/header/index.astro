@@ -4,26 +4,45 @@ import Link from '../link.astro';
 import Logo from '../../components/logo/index.astro';
 
 const header = scss`
-  @include box-grid;
+  @include box-grid($size: 72);
 
   align-items: center;
+  align-content: center;
   background-color: var(--bg);
+  display: grid;
+  grid-template-columns: minmax(var(--gap), 1fr) 77.5rem minmax(var(--gap), 1fr);
+`;
+
+const cnt = css`
+  align-items: center;
   display: flex;
+  gap: var(--gap);
+  grid-column: 2;
 `;
 
 const logoLink = css`
   align-items: center;
-  display: flex;
+  display: inline-flex;
   font-family: var(--font-outfit);
   font-size: var(--step-4);
   font-weight: 800;
   gap: 0.35em;
+  text-decoration: none;
 `;
+
+const nav = css`
+  display: inline;
+`
 ---
 
 <header class={header}>
-  <Link class={logoLink} href="/">
-    <Logo alt="" />
-    pre.style
-  </Link>
+  <div class={cnt}>
+    <Link class={logoLink} href="/">
+      <Logo alt="" />
+      pre.style
+    </Link>
+    <nav class={nav}>
+      
+    </nav>
+  </div>
 </header>

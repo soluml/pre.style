@@ -1,8 +1,15 @@
-@mixin box-grid($dir: up, $property: "height") {
+@use "sass:math";
+
+// Snap a box dimension to the vertical grid (multiples of --gap).
+// $size: null  → snap the element's intrinsic size (calc-size(auto, …))
+// $size: int   → pixel count, converted to rem (16 = 1rem) and snapped
+@mixin box-grid($dir: up, $property: "height", $size: null) {
   @if $property == "both" {
-    @include box-grid($dir, "height");
-    @include box-grid($dir, "width");
-  } @else {
+    @include box-grid($dir, "height", $size);
+    @include box-grid($dir, "width", $size);
+  } @else if $size == null {
     #{$property}: calc-size(auto, round($dir, size, var(--gap)));
+  } @else {
+    #{$property}: round($dir, math.div($size, 16) * 1rem, var(--gap));
   }
 }
