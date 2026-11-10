@@ -12,10 +12,27 @@ export default defineConfig({
   fonts: [
     {
       provider: fontProviders.fontsource(),
-      name: "Geist",
-      cssVariable: "--font-geist",
+      name: "DM Sans",
+      cssVariable: "--font-dm",
+      weights: ["100 1000"],
+      styles: ["normal", "italic"],
+    },
+    {
+      provider: fontProviders.fontsource(),
+      name: "Outfit",
+      cssVariable: "--font-outfit",
       weights: ["100 900"],
       styles: ["normal"],
+    },
+    {
+      // Static-only on Fontsource, so each weight is its own file. Code is
+      // only set at 400.
+      provider: fontProviders.fontsource(),
+      name: "IBM Plex Mono",
+      cssVariable: "--font-plex-mono",
+      weights: [400],
+      styles: ["normal"],
+      fallbacks: ["monospace"],
     },
   ],
   vite: {

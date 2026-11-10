@@ -16,6 +16,7 @@
 
   color-scheme: dark light;
   hanging-punctuation: first last;
+  interpolate-size: allow-keywords;
   height: 100%;
   width: 100%;
 }
@@ -49,9 +50,17 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: var(--font-outfit);
   text-wrap: balance;
 }
 
 p {
   text-wrap: pretty;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-plex-mono);
 }
