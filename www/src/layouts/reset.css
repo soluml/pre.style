@@ -41,6 +41,11 @@ body {
   }
 }
 
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   :has(:target) {
     scroll-behavior: smooth;
@@ -93,6 +98,21 @@ h6 {
 
 p {
   text-wrap: pretty;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+button,
+code,
+kbd,
+pre,
+samp {
+  text-box: trim-both cap alphabetic;
 }
 
 code,
