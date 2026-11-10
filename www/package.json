@@ -18,7 +18,7 @@
   "devDependencies": {
     "@astrojs/compiler-rs": "^0.5.3",
     "@iconify-json/simple-icons": "^1.2.102",
-    "@pre.style/vite": "3.1.0-alpha.10",
+    "@pre.style/vite": "3.1.0-alpha.11",
     "lightningcss": "^1.33.0",
     "oxfmt": "^0.74.0",
     "sass": "^1.107.0",
