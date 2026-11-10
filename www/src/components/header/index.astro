@@ -1,0 +1,28 @@
+---
+import { css, scss } from '@pre.style/core';
+import Link from '../link.astro';
+import Logo from '../../components/logo/index.astro';
+
+const header = scss`
+  @include box-grid;
+
+  align-items: center;
+  border: 1px solid currentColor;
+  display: flex;
+`;
+
+const logoLink = css`
+  align-items: center;
+  display: flex;
+  font-family: var(--font-outfit);
+  font-weight: 800;
+  gap: 0.5em;
+`;
+---
+
+<header class={header}>
+  <Link class={logoLink} href="/">
+    <Logo alt="" />
+    pre.style
+  </Link>
+</header>

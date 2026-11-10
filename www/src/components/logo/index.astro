@@ -1,0 +1,58 @@
+---
+import { Picture } from 'astro:assets';
+import type { ComponentProps } from 'astro/types';
+import logo from '../../img/logo.png';
+
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+type Props = DistributiveOmit<
+  ComponentProps<typeof Picture>,
+  'alt' | 'src' | 'densities' | 'widths' | 'layout'
+> & {alt: string};
+
+const DEFAULT_WIDTH = 80;
+
+// Scan every .astro source file at build time for usages of this component and
+// pick the largest `width`, so all instances share one set of generated images.
+const sources = import.meta.glob<string>('/src/**/*.astro', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+const importRe = /import\s+(\w+)\s+from\s+['"][^'"]*components\/logo(?:\/index(?:\.astro)?)?['"]/g;
+const widthRe = /\bwidth\s*=\s*(?:"(\d+)"|'(\d+)'|\{\s*(\d+)\s*\})/;
+
+const SOURCE_WIDTH = Math.max(
+  DEFAULT_WIDTH,
+  ...Object.entries(sources).flatMap(([file, code]) =>
+    [...code.matchAll(importRe)].flatMap(([, name]) =>
+      [...code.matchAll(new RegExp(`<${name}\\b[^>]*>`, 'g'))].map(([tag]) => {
+        if (!/\bwidth\s*=/.test(tag)) return DEFAULT_WIDTH;
+        const m = tag.match(widthRe);
+        if (!m) throw new Error(`${file}: <${name}> width must be a numeric literal`);
+        return Number(m[1] ?? m[2] ?? m[3]);
+      }),
+    ),
+  ),
+);
+
+const {width = DEFAULT_WIDTH, style, ...props} = Astro.props;
+
+// Size from the source image's intrinsic aspect ratio (read from logo.png metadata at build time).
+const w = Number(width);
+const size = {
+  width: `${w}px`,
+  height: `${Math.round((w * logo.height) / logo.width * 100) / 100}px`,
+};
+---
+
+<Picture
+  densities={[1, 2, 3]}
+  formats={['avif', 'webp', 'png']}
+  src={logo}
+  width={SOURCE_WIDTH}
+  style={style ? [size, style] : size}
+  loading='eager'
+  {...props}
+/>

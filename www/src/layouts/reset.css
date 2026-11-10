@@ -18,15 +18,24 @@
   hanging-punctuation: first last;
   interpolate-size: allow-keywords;
   height: 100%;
+  overflow-wrap: anywhere;
+  overscroll-behavior: none;
+  tab-size: 2;
   width: 100%;
+  word-break: normal;
 }
 
 body {
+  font-optical-sizing: auto;
   line-height: var(--grid);
   min-height: 100%;
   min-height: max(100svh, 100%);
-  overflow: clip auto;
+  quotes: "\201C" "\201D";
   width: 100%;
+
+  @media (width >= 344px) {
+    overflow: clip auto;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -63,4 +72,28 @@ kbd,
 pre,
 samp {
   font-family: var(--font-plex-mono);
+}
+
+pre {
+  white-space: pre-wrap;
+}
+
+:target {
+  scroll-margin-block: 5ex;
+}
+
+a {
+  color: currentColor;
+  text-decoration: none;
+  text-decoration-skip-ink: auto;
+
+  &:where(:hover, :focus-visible) {
+    text-decoration: underline;
+  }
+}
+
+svg:where(:not([width], [height], [style])) {
+  aspect-ratio: 1;
+  height: 1lh;
+  vertical-align: text-bottom;
 }

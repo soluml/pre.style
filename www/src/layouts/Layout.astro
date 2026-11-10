@@ -1,6 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import { scss } from '@pre.style/core';
+import Header from '../components/header/index.astro'
 
 import './reset.css' with { type: 'pre.style' };
 import 'virtual:pre.style.css';
@@ -46,14 +47,6 @@ const body = scss`
   //   100% { opacity: 1; }
   // }
 `;
-
-const header = scss`
-  @include box-grid;
-
-  border: 1px solid currentColor;
-`
-
-
 ---
 
 <!doctype html>
@@ -70,7 +63,7 @@ const header = scss`
     <Font cssVariable="--font-plex-mono" />
   </head>
   <body class={body}>
-    <header class={header}>ASDASD</header>
+    <Header />
     <main hidden><slot /></main>
   </body>
 </html>
