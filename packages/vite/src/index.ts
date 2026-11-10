@@ -1,6 +1,6 @@
 import { readFile, glob } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { decode } from '@jridgewell/sourcemap-codec';
 import { MagicString } from 'magic-string';
 import { createCn } from '@pre.style/core';
@@ -812,8 +812,13 @@ export default function preStyle(options: PreStyleOptions = {}): Plugin[] {
 
     async transform(code, id) {
       const file = cleanId(id);
+      // Virtual components (such as `~icons/…` from unplugin-icons) aren't
+      // files, so the scan never found them and there's nothing to read.
+      // Their code can still say `pre.style`: Astro compiles in the site's
+      // URL.
       if (
         !(ASTRO.test(id) || ASTRO_SCRIPT.test(id)) ||
+        !isAbsolute(file) ||
         (file.includes('/node_modules/') && !inLibrary(file)) ||
         !code.includes('pre.style')
       )

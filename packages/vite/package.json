@@ -1,6 +1,6 @@
 {
   "name": "@pre.style/vite",
-  "version": "3.1.0-alpha.10",
+  "version": "3.1.0-alpha.11",
   "description": "Vite plugin for pre.style.",
   "keywords": [
     "atomic-css",

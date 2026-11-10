@@ -374,6 +374,31 @@ describe('Astro components', () => {
     );
   });
 
+  // Astro compiles the site's URL into every component, so a virtual one's
+  // code can say `pre.style` without there being a file to read.
+  test('skips virtual components', async () => {
+    const virtual: Plugin = {
+      name: 'virtual-icon',
+      resolveId: (id) => (id === '~icons/acme/star.astro' ? id : undefined),
+      load: (id) =>
+        id === '~icons/acme/star.astro'
+          ? "---\nexport const site = 'https://pre.style';\n---\n<svg></svg>"
+          : undefined,
+    };
+    const base = astroConfig();
+    const server = await createServer({
+      ...base,
+      plugins: [...base.plugins!, virtual],
+      server: { middlewareMode: true, ws: false },
+    });
+    try {
+      const { code } = (await server.transformRequest('~icons/acme/star.astro'))!;
+      assert.match(code, /https:\/\/pre\.style/);
+    } finally {
+      await server.close();
+    }
+  });
+
   test("errors report the position in the component, not Astro's output", async () => {
     writeFileSync(card, original.replace('color: red;', 'color: red;\n  & > { }}'));
     const server = await createServer({
