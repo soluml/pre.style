@@ -14,22 +14,6 @@
   --grid: 1.5;
   --gap: calc(1rem * var(--grid));
 
-  /*
-   * Fluid type scale: interpolates between 344px and 1240px viewports.
-   * @344px: 16px base, 1.2 ratio (minor third)
-   * @1240px: 18px base, 1.25 ratio (major third)
-   * --step-1 is the base (body) size.
-   * rem + vw keeps the scale responsive to user zoom/font-size settings.
-   */
-  --step--1: clamp(0.6944rem, 0.6846rem + 0.0456vw, 0.72rem);
-  --step-0: clamp(0.8333rem, 0.8077rem + 0.119vw, 0.9rem);
-  --step-1: clamp(1rem, 0.952rem + 0.2232vw, 1.125rem);
-  --step-2: clamp(1.2rem, 1.1208rem + 0.3683vw, 1.4062rem);
-  --step-3: clamp(1.44rem, 1.318rem + 0.5675vw, 1.7578rem);
-  --step-4: clamp(1.728rem, 1.5478rem + 0.838vw, 2.1973rem);
-  --step-5: clamp(2.0736rem, 1.8152rem + 1.2018vw, 2.7466rem);
-  --step-6: clamp(2.4883rem, 2.1255rem + 1.6873vw, 3.4332rem);
-
   color-scheme: dark light;
   hanging-punctuation: first last;
   interpolate-size: allow-keywords;
@@ -42,6 +26,8 @@
 }
 
 body {
+  background: var(--bg);
+  color: var(--text);
   font-optical-sizing: auto;
   font-size: var(--step-1);
   line-height: var(--grid);

@@ -1,0 +1,173 @@
+/* pre.style — OKLCH / Display-P3 color ramps
+   Values are authored in oklch() and chroma-clamped to the Display-P3 gamut.
+   Browsers gamut-map automatically on sRGB displays; hex fallbacks live in tokens.json. */
+:root {
+  /*
+   * Fluid type scale: interpolates between 344px and 1240px viewports.
+   * @344px: 16px base, 1.2 ratio (minor third)
+   * @1240px: 18px base, 1.25 ratio (major third)
+   * --step-1 is the base (body) size.
+   * rem + vw keeps the scale responsive to user zoom/font-size settings.
+   */
+  --step--1: clamp(0.6944rem, 0.6846rem + 0.0456vw, 0.72rem);
+  --step-0: clamp(0.8333rem, 0.8077rem + 0.119vw, 0.9rem);
+  --step-1: clamp(1rem, 0.952rem + 0.2232vw, 1.125rem);
+  --step-2: clamp(1.2rem, 1.1208rem + 0.3683vw, 1.4062rem);
+  --step-3: clamp(1.44rem, 1.318rem + 0.5675vw, 1.7578rem);
+  --step-4: clamp(1.728rem, 1.5478rem + 0.838vw, 2.1973rem);
+  --step-5: clamp(2.0736rem, 1.8152rem + 1.2018vw, 2.7466rem);
+  --step-6: clamp(2.4883rem, 2.1255rem + 1.6873vw, 3.4332rem);
+
+  /* sand · hue 75 */
+  --sand-50: oklch(0.985 0.01 75);
+  --sand-100: oklch(0.968 0.018 75);
+  --sand-200: oklch(0.935 0.024 75);
+  --sand-300: oklch(0.885 0.028 75);
+  --sand-400: oklch(0.78 0.032 75);
+  --sand-500: oklch(0.64 0.036 75);
+  --sand-600: oklch(0.52 0.04 75);
+  --sand-700: oklch(0.42 0.044 75);
+  --sand-800: oklch(0.33 0.04 75);
+  --sand-900: oklch(0.25 0.034 75);
+  --sand-950: oklch(0.19 0.026 75);
+
+  /* brand · hue 62 */
+  --brand-50: oklch(0.98 0.014 62);
+  --brand-100: oklch(0.955 0.035 62);
+  --brand-200: oklch(0.92 0.065 62);
+  --brand-300: oklch(0.88 0.101 62);
+  --brand-400: oklch(0.835 0.144 62);
+  --brand-500: oklch(0.79 0.19 62);
+  --brand-600: oklch(0.7 0.182 62);
+  --brand-700: oklch(0.59 0.153 62);
+  --brand-800: oklch(0.48 0.125 62);
+  --brand-900: oklch(0.39 0.095 62);
+  --brand-950: oklch(0.28 0.065 62);
+
+  /* violet · hue 295 */
+  --violet-50: oklch(0.97 0.016 295);
+  --violet-100: oklch(0.94 0.033 295);
+  --violet-200: oklch(0.89 0.064 295);
+  --violet-300: oklch(0.82 0.109 295);
+  --violet-400: oklch(0.72 0.176 295);
+  --violet-500: oklch(0.62 0.248 295);
+  --violet-600: oklch(0.53 0.29 295);
+  --violet-700: oklch(0.45 0.25 295);
+  --violet-800: oklch(0.37 0.2 295);
+  --violet-900: oklch(0.3 0.14 295);
+  --violet-950: oklch(0.22 0.09 295);
+
+  /* blue · hue 250 */
+  --blue-50: oklch(0.97 0.016 250);
+  --blue-100: oklch(0.94 0.031 250);
+  --blue-200: oklch(0.89 0.059 250);
+  --blue-300: oklch(0.83 0.094 250);
+  --blue-400: oklch(0.75 0.143 250);
+  --blue-500: oklch(0.67 0.194 250);
+  --blue-600: oklch(0.58 0.21 250);
+  --blue-700: oklch(0.49 0.177 250);
+  --blue-800: oklch(0.41 0.15 250);
+  --blue-900: oklch(0.33 0.11 250);
+  --blue-950: oklch(0.24 0.07 250);
+
+  /* cyan · hue 205 */
+  --cyan-50: oklch(0.98 0.016 205);
+  --cyan-100: oklch(0.955 0.04 205);
+  --cyan-200: oklch(0.92 0.07 205);
+  --cyan-300: oklch(0.88 0.11 205);
+  --cyan-400: oklch(0.84 0.13 205);
+  --cyan-500: oklch(0.79 0.135 205);
+  --cyan-600: oklch(0.7 0.125 205);
+  --cyan-700: oklch(0.6 0.11 205);
+  --cyan-800: oklch(0.5 0.09 205);
+  --cyan-900: oklch(0.41 0.07 205);
+  --cyan-950: oklch(0.3 0.05 205);
+
+  /* pink · hue 8 */
+  --pink-50: oklch(0.975 0.016 8);
+  --pink-100: oklch(0.95 0.032 8);
+  --pink-200: oklch(0.905 0.065 8);
+  --pink-300: oklch(0.85 0.108 8);
+  --pink-400: oklch(0.775 0.176 8);
+  --pink-500: oklch(0.7 0.225 8);
+  --pink-600: oklch(0.62 0.23 8);
+  --pink-700: oklch(0.53 0.21 8);
+  --pink-800: oklch(0.44 0.17 8);
+  --pink-900: oklch(0.35 0.12 8);
+  --pink-950: oklch(0.26 0.08 8);
+
+  /* green · hue 150 */
+  --green-50: oklch(0.98 0.025 150);
+  --green-100: oklch(0.955 0.055 150);
+  --green-200: oklch(0.915 0.11 150);
+  --green-300: oklch(0.865 0.17 150);
+  --green-400: oklch(0.8 0.205 150);
+  --green-500: oklch(0.73 0.2 150);
+  --green-600: oklch(0.64 0.17 150);
+  --green-700: oklch(0.54 0.14 150);
+  --green-800: oklch(0.45 0.11 150);
+  --green-900: oklch(0.37 0.085 150);
+  --green-950: oklch(0.27 0.06 150);
+
+  /* red · hue 25 */
+  --red-50: oklch(0.975 0.015 25);
+  --red-100: oklch(0.95 0.03 25);
+  --red-200: oklch(0.905 0.062 25);
+  --red-300: oklch(0.845 0.108 25);
+  --red-400: oklch(0.765 0.177 25);
+  --red-500: oklch(0.69 0.225 25);
+  --red-600: oklch(0.61 0.235 25);
+  --red-700: oklch(0.53 0.205 25);
+  --red-800: oklch(0.44 0.16 25);
+  --red-900: oklch(0.36 0.115 25);
+  --red-950: oklch(0.26 0.08 25);
+}
+
+/* ---------- Semantic tokens ---------- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: oklch(0.975 0.02 85);
+  --bg-grid: oklch(0.9 0.03 80 / 0.55);
+  --surface: oklch(0.992 0.008 85);
+  --surface-2: oklch(0.955 0.022 82);
+  --border: oklch(0.8 0.04 70);
+  --border-strong: oklch(0.3 0.05 45);
+  --text: oklch(0.24 0.055 45);
+  --text-muted: oklch(0.45 0.045 55);
+  --text-faint: oklch(0.6 0.035 65);
+  --accent: var(--brand-500);
+  --accent-text: oklch(0.52 0.15 48);
+  --accent-soft: oklch(0.955 0.05 75);
+  --on-accent: oklch(0.22 0.05 45);
+  --btn-primary-bg: oklch(0.24 0.055 45);
+  --btn-primary-text: oklch(0.975 0.02 85);
+  --code-bg: oklch(0.215 0.02 60);
+  --code-text: oklch(0.93 0.015 80);
+  --shadow:
+    0 1px 0 oklch(1 0 0 / 0.6) inset, 0 10px 30px -12px oklch(0.4 0.08 50 / 0.3);
+  --link: oklch(0.5 0.2 295);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: oklch(0.215 0.022 55);
+  --bg-grid: oklch(0.32 0.03 55 / 0.55);
+  --surface: oklch(0.255 0.026 55);
+  --surface-2: oklch(0.285 0.028 55);
+  --border: oklch(0.42 0.04 55);
+  --border-strong: oklch(0.93 0.02 80);
+  --text: oklch(0.975 0.015 85);
+  --text-muted: oklch(0.8 0.03 75);
+  --text-faint: oklch(0.64 0.03 70);
+  --accent: var(--brand-400);
+  --accent-text: oklch(0.82 0.17 68);
+  --accent-soft: oklch(0.32 0.06 62);
+  --on-accent: oklch(0.2 0.04 50);
+  --btn-primary-bg: oklch(0.8 0.175 66);
+  --btn-primary-text: oklch(0.2 0.04 50);
+  --code-bg: oklch(0.165 0.016 55);
+  --code-text: oklch(0.93 0.015 80);
+  --shadow:
+    0 1px 0 oklch(1 0 0 / 0.05) inset, 0 14px 40px -14px oklch(0 0 0 / 0.6);
+  --link: oklch(0.8 0.14 295);
+}
