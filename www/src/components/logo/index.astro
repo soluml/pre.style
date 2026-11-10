@@ -10,7 +10,7 @@ type Props = DistributiveOmit<
   'alt' | 'src' | 'densities' | 'widths' | 'layout'
 > & {alt: string};
 
-const DEFAULT_WIDTH = 80;
+const DEFAULT_WIDTH = 70;
 
 // Scan every .astro source file at build time for usages of this component and
 // pick the largest `width`, so all instances share one set of generated images.
