@@ -10,7 +10,7 @@ const header = scss`
   align-content: center;
   background-color: var(--bg);
   display: grid;
-  grid-template-columns: minmax(var(--gap), 1fr) 77.5rem minmax(var(--gap), 1fr);
+  grid-template-columns: minmax(var(--gap), 1fr) minmax(0, 77.5rem) minmax(var(--gap), 1fr);
 `;
 
 const cnt = css`
@@ -18,6 +18,9 @@ const cnt = css`
   display: flex;
   gap: var(--gap);
   grid-column: 2;
+  justify-content: space-between;
+  min-width: fit-content;
+  width: 30rem;
 `;
 
 const logoLink = css`
@@ -31,7 +34,9 @@ const logoLink = css`
 `;
 
 const nav = css`
-  display: inline;
+  display: flex;
+  gap: var(--gap);
+  font-weight: 600;
 `;
 ---
 
@@ -41,6 +46,9 @@ const nav = css`
       <Logo alt="" />
       pre.style
     </Link>
-    <nav class={nav}></nav>
+    <nav aria-label="Main" class={nav}>
+      <Link href="/">Blog</Link>
+      <Link href="/">Docs</Link>
+    </nav>
   </div>
 </header>

@@ -3,14 +3,19 @@ import type { HTMLAttributes } from 'astro/types';
 
 type Props = HTMLAttributes<'a'>;
 
-const url = Astro.props.href && new URL(Astro.props.href, Astro.url);
+const url = Astro.props.href ? new URL(Astro.props.href, Astro.url) : undefined;
 const isExternal = url ? url.host !== Astro.url.host : false;
-const isCurrent = url
-  ? Astro.url.href.endsWith('/')
-    ? url.href === Astro.url.href.slice(0, -1)
-    : url.href === Astro.url.href
-  : false;
-const isContained = url ? isCurrent || Astro.url.href.startsWith(url.href) : false;
+
+// Compare paths without a trailing slash, so `/docs` and `/docs/` match either
+// way. Contained means a page under the link's path (`/docs/api` for `/docs`),
+// matched on whole segments; the home link would contain every page, so it
+// only counts when it's the current page.
+const strip = (path: string) => path.replace(/\/+$/, '');
+const linkPath = url && !isExternal ? strip(url.pathname) : undefined;
+const pagePath = strip(Astro.url.pathname);
+const isCurrent = linkPath !== undefined && linkPath === pagePath;
+const isContained =
+  isCurrent || (linkPath !== undefined && linkPath !== '' && pagePath.startsWith(`${linkPath}/`));
 ---
 
 <a
