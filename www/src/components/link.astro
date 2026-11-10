@@ -1,24 +1,23 @@
 ---
-import type { HTMLAttributes } from "astro/types";
+import type { HTMLAttributes } from 'astro/types';
 
-type Props = HTMLAttributes<"a">;
+type Props = HTMLAttributes<'a'>;
 
 const url = Astro.props.href && new URL(Astro.props.href, Astro.url);
 const isExternal = url ? url.host !== Astro.url.host : false;
 const isCurrent = url
-  ? Astro.url.href.endsWith("/")
+  ? Astro.url.href.endsWith('/')
     ? url.href === Astro.url.href.slice(0, -1)
     : url.href === Astro.url.href
   : false;
-const isContained = url
-  ? isCurrent || Astro.url.href.startsWith(url.href)
-  : false;
+const isContained = url ? isCurrent || Astro.url.href.startsWith(url.href) : false;
 ---
 
 <a
-  aria-current={isCurrent ? "page" : null}
-  rel={isExternal ? "noopener" : null}
+  aria-current={isCurrent ? 'page' : null}
+  rel={isExternal ? 'noopener' : null}
   data-contained={isContained ? true : undefined}
-  {...Astro.props}>
+  {...Astro.props}
+>
   <slot />
 </a>

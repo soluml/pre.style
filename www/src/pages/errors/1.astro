@@ -26,14 +26,16 @@ css\`color: \${theme.color};\`;`;
   description="A runtime value in a pre.style block wasn't a string, a finite number, null, or undefined."
 >
   <main>
-    <p><a href="/errors">Runtime errors</a></p>
+    <p>
+      <a href="/errors">Runtime errors</a>
+    </p>
     <h1>Error 1: invalid runtime value</h1>
     <p>
       <code>{'pre.style error 1 (<type>): https://pre.style/errors/1'}</code>
     </p>
     <p>
-      A <code>{'${…}'}</code> in a <code>css</code> or <code>scss</code> block held a value pre.style
-      can't use. The message's <code>{'<type>'}</code> is the value's type, from
+      A <code>{'${…}'}</code> in a <code>css</code> or <code>scss</code> block held a value
+      pre.style can't use. The message's <code>{'<type>'}</code> is the value's type, from
       <code>typeof</code>.
     </p>
 
@@ -59,28 +61,34 @@ css\`color: \${theme.color};\`;`;
 
     <h2>Common causes</h2>
 
-    <h3><code>boolean</code>: a condition with <code>&&</code></h3>
+    <h3>
+      <code>boolean</code>: a condition with <code>&&</code>
+    </h3>
     <p>
       <code>{'open && width'}</code> is <code>false</code> when <code>open</code> is false. Use
       <code>null</code> for "no value".
     </p>
     <pre><code>{conditional}</code></pre>
 
-    <h3><code>number</code>: <code>NaN</code> or <code>Infinity</code></h3>
+    <h3>
+      <code>number</code>: <code>NaN</code> or <code>Infinity</code>
+    </h3>
     <p>
       Ordinary numbers are fine, so this type means the value wasn't finite. It usually comes from
       parsing text that isn't a number, doing math on <code>undefined</code>, or dividing by zero.
     </p>
     <pre><code>{parsed}</code></pre>
 
-    <h3><code>object</code> or <code>function</code>: the wrong variable</h3>
+    <h3>
+      <code>object</code> or <code>function</code>: the wrong variable
+    </h3>
     <p>Check that the expression is the value itself, rather than what holds it.</p>
     <pre><code>{object}</code></pre>
 
     <h2>Finding the value</h2>
     <p>
-      Run a development build. Its message says which value failed and shows the text around it,
-      and suggests a fix. The stack trace points to the component in either build.
+      Run a development build. Its message says which value failed and shows the text around it, and
+      suggests a fix. The stack trace points to the component in either build.
     </p>
 
     <h2>Not this error</h2>

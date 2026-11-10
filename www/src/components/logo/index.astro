@@ -3,12 +3,11 @@ import { Picture } from 'astro:assets';
 import type { ComponentProps } from 'astro/types';
 import logo from '../../img/logo.png';
 
-
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type Props = DistributiveOmit<
   ComponentProps<typeof Picture>,
   'alt' | 'src' | 'densities' | 'widths' | 'layout'
-> & {alt: string};
+> & { alt: string };
 
 const DEFAULT_WIDTH = 70;
 
@@ -37,13 +36,13 @@ const SOURCE_WIDTH = Math.max(
   ),
 );
 
-const {width = DEFAULT_WIDTH, style, ...props} = Astro.props;
+const { width = DEFAULT_WIDTH, style, ...props } = Astro.props;
 
 // Size from the source image's intrinsic aspect ratio (read from logo.png metadata at build time).
 const w = Number(width);
 const size = {
   width: `${w}px`,
-  height: `${Math.round((w * logo.height) / logo.width * 100) / 100}px`,
+  height: `${Math.round(((w * logo.height) / logo.width) * 100) / 100}px`,
 };
 ---
 
@@ -53,6 +52,6 @@ const size = {
   src={logo}
   width={SOURCE_WIDTH}
   style={style ? [size, style] : size}
-  loading='eager'
+  loading="eager"
   {...props}
 />

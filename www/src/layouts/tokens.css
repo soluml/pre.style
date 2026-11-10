@@ -125,7 +125,7 @@
 
 /* ---------- Semantic tokens ---------- */
 :root,
-[data-theme="light"] {
+[data-theme='light'] {
   color-scheme: light;
   --bg: oklch(0.975 0.02 85);
   --bg-grid: oklch(0.9 0.03 80 / 0.55);
@@ -144,11 +144,10 @@
   --btn-primary-text: oklch(0.975 0.02 85);
   --code-bg: oklch(0.215 0.02 60);
   --code-text: oklch(0.93 0.015 80);
-  --shadow:
-    0 1px 0 oklch(1 0 0 / 0.6) inset, 0 10px 30px -12px oklch(0.4 0.08 50 / 0.3);
+  --shadow: 0 1px 0 oklch(1 0 0 / 0.6) inset, 0 10px 30px -12px oklch(0.4 0.08 50 / 0.3);
   --link: oklch(0.5 0.2 295);
 }
-[data-theme="dark"] {
+[data-theme='dark'] {
   color-scheme: dark;
   --bg: oklch(0.215 0.022 55);
   --bg-grid: oklch(0.32 0.03 55 / 0.55);
@@ -167,7 +166,6 @@
   --btn-primary-text: oklch(0.2 0.04 50);
   --code-bg: oklch(0.165 0.016 55);
   --code-text: oklch(0.93 0.015 80);
-  --shadow:
-    0 1px 0 oklch(1 0 0 / 0.05) inset, 0 14px 40px -14px oklch(0 0 0 / 0.6);
+  --shadow: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 14px 40px -14px oklch(0 0 0 / 0.6);
   --link: oklch(0.8 0.14 295);
 }

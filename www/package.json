@@ -7,15 +7,19 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "astro sync && tsc --runExternalCode"
+    "typecheck": "astro sync && tsc --runExternalCode",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "dependencies": {
     "@pre.style/core": "3.1.0-alpha.6",
     "astro": "^7.4.2"
   },
   "devDependencies": {
+    "@astrojs/compiler-rs": "^0.5.3",
     "@pre.style/vite": "3.1.0-alpha.10",
     "lightningcss": "^1.33.0",
+    "oxfmt": "^0.74.0",
     "sass": "^1.107.0",
     "typescript": "7.1.0-beta",
     "vite": "^8.3.5"

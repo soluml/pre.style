@@ -1,7 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import { scss } from '@pre.style/core';
-import Header from '../components/header/index.astro'
+import Header from '../components/header/index.astro';
 
 import './tokens.css' with { type: 'pre.style' };
 import './reset.css' with { type: 'pre.style' };
@@ -55,12 +55,14 @@ const body = scss`
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
-    <Font cssVariable="--font-dm" preload={[{ style: "normal" }]} />
+    <Font cssVariable="--font-dm" preload={[{ style: 'normal' }]} />
     <Font cssVariable="--font-outfit" preload />
     <Font cssVariable="--font-plex-mono" />
   </head>
   <body class={body}>
     <Header />
-    <main hidden><slot /></main>
+    <main hidden>
+      <slot />
+    </main>
   </body>
 </html>

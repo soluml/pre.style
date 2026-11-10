@@ -9,9 +9,8 @@ const hero = css`
   margin: auto;
   text-align: center;
   max-width: 41rem;
-  padding: 1.5rem 1.rem;
+  padding: 1.5rem 1rem;
 `;
-
 
 const visuallyHidden = css`
   position: absolute;
@@ -176,40 +175,80 @@ const link = css`
   description="Write plain CSS or SCSS next to your markup, and pre.style compiles it at build time into atomic CSS classes. Docs coming soon."
 >
   <div class={hero}>
-    <h1 class={css`margin: 0;`}>
+    <h1
+      class={css`
+        margin: 0;
+      `}
+    >
       <span class={visuallyHidden}>pre.style</span>
       <Logo class={logo} aria-hidden="true" focusable="false" />
     </h1>
     <p class={tagline}>
-      Zero-runtime CSS-in-JS. Write plain CSS or SCSS next to your markup, and pre.style compiles
-      it at build time into atomic CSS classes.
+      Zero-runtime CSS-in-JS. Write plain CSS or SCSS next to your markup, and pre.style compiles it
+      at build time into atomic CSS classes.
     </p>
     <p class={badge}>Docs coming soon</p>
     <div class={install}>
       <div class={codeBox}>
         <code class={code}>
           <span aria-hidden="true">
-            npm <span class={flagShort}>i -D</span><span class={flagMedium}>install -D</span><span class={flagLong}>install --save-dev</span> @pre.style/vite lightningcss
+            npm <span class={flagShort}>i -D</span>
+            <span class={flagMedium}>install -D</span>
+            <span class={flagLong}>install --save-dev</span> @pre.style/vite lightningcss
           </span>
           <span class:list={[visuallyHidden, srCommand]}>{installCommand}</span>
         </code>
         <button class={copyButton} type="button" data-copy={installCommand} hidden>
           <span class={visuallyHidden}>Copy install command</span>
-          <svg data-icon="copy" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <svg
+            data-icon="copy"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
             <rect x="9" y="9" width="12" height="12" rx="2" />
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
-          <svg data-icon="done" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display: none">
+          <svg
+            data-icon="done"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+            style="display: none"
+          >
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </button>
         <span class={visuallyHidden} role="status" data-copy-status></span>
       </div>
     </div>
-    <p class={css`display: inline-flex; gap: .25rem;`}>
-      <a class={link} href="https://github.com/soluml/pre.style">GitHub</a>
+    <p
+      class={css`
+        display: inline-flex;
+        gap: 0.25rem;
+      `}
+    >
+      <a class={link} href="https://github.com/soluml/pre.style">
+        GitHub
+      </a>
       &bull;
-      <a class={link} href="https://www.npmjs.com/package/@pre.style/core">npm</a>
+      <a class={link} href="https://www.npmjs.com/package/@pre.style/core">
+        npm
+      </a>
     </p>
   </div>
 </Layout>

@@ -33,7 +33,7 @@ body {
   line-height: var(--grid);
   min-height: 100%;
   min-height: max(100svh, 100%);
-  quotes: "\201C" "\201D";
+  quotes: '\201C' '\201D';
   width: 100%;
 
   @media (width >= 344px) {
