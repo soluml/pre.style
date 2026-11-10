@@ -1,5 +1,7 @@
 import { defineConfig, fontProviders } from 'astro/config';
 import preStyle from '@pre.style/vite';
+import autoImport from 'unplugin-auto-import/vite';
+import iconsResolver from 'unplugin-icons/resolver';
 import Icons from 'unplugin-icons/vite';
 
 // Unlike the demos, the site uses pre.style's published packages from npm,
@@ -40,6 +42,14 @@ export default defineConfig({
     plugins: [
       preStyle({
         lightningcss: { minify: true },
+      }),
+      autoImport({
+        resolvers: [
+          iconsResolver({
+            prefix: 'Icon',
+            extension: 'jsx',
+          }),
+        ],
       }),
       Icons({ autoInstall: true, scale: 0, compiler: 'astro' }),
     ],

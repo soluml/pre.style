@@ -2,6 +2,7 @@
 import { css, scss } from '@pre.style/core';
 import Link from '../link.astro';
 import Logo from '../../components/logo/index.astro';
+import GithubIcon from '~icons/icomoon-free/github';
 
 const header = scss`
   @include box-grid($size: 72);
@@ -21,6 +22,7 @@ const cnt = css`
   justify-content: space-between;
   min-width: fit-content;
   width: 30rem;
+  max-width: 100%;
 `;
 
 const logoLink = css`
@@ -31,12 +33,17 @@ const logoLink = css`
   font-weight: 800;
   gap: 0.35em;
   text-decoration: none;
+  white-space: nowrap;
 `;
 
 const nav = css`
   display: flex;
-  gap: var(--gap);
+  gap: calc(var(--gap) / 2);
   font-weight: 600;
+
+  @media (width >= 500px) {
+    gap: var(--gap);
+  }
 `;
 ---
 
@@ -49,6 +56,9 @@ const nav = css`
     <nav aria-label="Main" class={nav}>
       <Link href="/">Blog</Link>
       <Link href="/">Docs</Link>
+      <Link href="https://github.com/soluml/pre.style" aria-label="Github">
+        <GithubIcon />
+      </Link>
     </nav>
   </div>
 </header>
