@@ -12,7 +12,7 @@
   "dependencies": {
     "@astrojs/node": "^11.1.9",
     "@astrojs/react": "^7.1.1",
-    "@pre.style/core": "3.1.0-alpha.8",
+    "@pre.style/core": "3.1.0-alpha.9",
     "astro": "^7.4.2",
     "pre.style-demo-react-ui": "0.0.0",
     "react": "^19.3.1",
