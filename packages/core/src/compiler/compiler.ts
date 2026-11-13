@@ -365,7 +365,7 @@ export class Compiler {
   // anything, for tools that only need the names (such as the TypeScript
   // content mapper).
   classNames(sheet: Stylesheet): string[] {
-    const { options } = this.#library(sheet.file);
+    const { options } = this.#sheetOptions(sheet);
     try {
       const parsed = parseStylesheet(
         sheet.code,
@@ -576,23 +576,25 @@ export class Compiler {
 
   // Parses a stylesheet file and registers its classes and global rules, so
   // the output includes them once the file is used.
-  #parseSheet(sheet: Stylesheet): ParsedStylesheet {
-    const { library, prependFiles, prependParts, ...rest } = this.#library(sheet.file);
-    let { options } = rest;
-    // A prepended file isn't prepended to itself when it's compiled as a
-    // stylesheet (TypeScript's content mapper compiles every .scss file in a
-    // program): its rules would be repeated as globals, and Sass rejects a
-    // module it loads twice with `@use`. The other prepended files are.
+  // The library a stylesheet file belongs to, and the options it's parsed
+  // with. A prepended file isn't prepended to itself when it's compiled as a
+  // stylesheet (TypeScript's content mapper compiles every .scss file in a
+  // program): its rules would be repeated as globals, and Sass rejects a
+  // module it loads twice with `@use`. The other prepended files are.
+  #sheetOptions(sheet: Stylesheet): { library: number; options: ParseOptions } {
+    const { library, options, prependFiles, prependParts } = this.#library(sheet.file);
     // Resolved like the prepended paths, since TypeScript passes `C:/…` on Windows.
     const own = prependFiles[sheet.lang].indexOf(resolvePath(sheet.file));
-    if (own !== -1)
-      options = {
-        ...options,
-        prepend: {
-          ...options.prepend,
-          [sheet.lang]: prependParts[sheet.lang].filter((_, i) => i !== own).join('\n'),
-        },
-      };
+    if (own === -1) return { library, options };
+    const others = prependParts[sheet.lang].filter((_, i) => i !== own).join('\n');
+    return {
+      library,
+      options: { ...options, prepend: { ...options.prepend, [sheet.lang]: others } },
+    };
+  }
+
+  #parseSheet(sheet: Stylesheet): ParsedStylesheet {
+    const { library, options } = this.#sheetOptions(sheet);
     const cacheKey = `${library}\n${sheet.lang}\n${sheet.file}\n${sheet.code}`;
     let parsed = this.#stylesheets.get(cacheKey);
     if (parsed === undefined) {
