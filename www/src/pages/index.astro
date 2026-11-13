@@ -7,7 +7,6 @@ const hero = css`
   display: grid;
   place-items: center;
   margin: auto;
-  padding: 2rem 1rem;
   text-align: center;
   max-width: 40rem;
   width: 100%;
@@ -46,7 +45,7 @@ const tagline = css`
   margin: 0 0 2rem;
   text-wrap: balance;
 
-  @media (min-width: 768px) {
+  @media (width >= 768px) {
     font-size: 1.5rem;
   }
 `;
@@ -57,7 +56,7 @@ const badge = css`
   margin: 0 0 2rem;
   padding: 0.375rem 1rem;
   border-radius: 999px;
-  background-color: rgb(0 0 0 / 0.75);
+  background-color: rgb(0 0 0 / 75%);
   font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -88,7 +87,7 @@ const codeBox = css`
   max-width: 100%;
   padding: 0.5rem;
   border-radius: 0.5rem;
-  background-color: rgb(0 0 0 / 0.75);
+  background-color: rgb(0 0 0 / 75%);
 `;
 
 const code = css`
@@ -98,6 +97,7 @@ const code = css`
   overflow-x: auto;
   padding: 0.5rem;
   white-space: nowrap;
+
   /* Keeps the visually hidden full command inside this scroller, rather than
      widening the page when the command overflows. */
   position: relative;
@@ -141,11 +141,11 @@ const copyButton = css`
   border: 0;
   border-radius: 0.375rem;
   background: none;
-  color: rgb(255 255 255 / 0.8);
+  color: rgb(255 255 255 / 80%);
   cursor: pointer;
 
   &:hover {
-    background-color: rgb(255 255 255 / 0.12);
+    background-color: rgb(255 255 255 / 12%);
     color: #fff;
   }
 
