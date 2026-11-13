@@ -1128,6 +1128,7 @@ pre.style's config sets no style rules of its own: the rules come from the confi
 - **Knows your prepended files.** Custom properties, keyframes, and custom media from your `prependFiles` are known to rules such as `no-unknown-custom-properties`, with each library's own files for its blocks.
 - **Knows `composes`.** It isn't reported as an unknown property, and its value is checked.
 - **Reports build errors** with the `pre-style/compile` rule: invalid CSS, Sass errors (with your prepended variables and mixins defined), `${…}` where it can't go, `composes` mistakes, and `css` used other than as a tagged template. Stylesheet files are checked only if they're imported `with { type: 'pre.style' }`, so ordinary CSS files aren't.
+- **Lints `<style>` tags too,** in Astro components and HTML, when [`postcss-html`](https://github.com/ota-meshi/postcss-html) is installed: each `<style>` tag (with its `lang`) and `style` attribute is linted with the file's blocks. You can extend `stylelint-config-html` as well; pre.style's config, last, replaces its syntax with one that handles both.
 
 ### Stylelint options
 
@@ -1151,11 +1152,31 @@ export default {
 
 ### SCSS
 
-With `stylelint-config-standard-scss`, put it before pre.style's config in `extends`. If you turn on `stylelint-scss`'s `scss/property-no-unknown`, which doesn't read Stylelint's syntax settings, allow `composes` yourself:
+If you have `scss` blocks or `.scss` files, extend `stylelint-config-standard-scss` (which includes `stylelint-config-standard`), before pre.style's config. Stylelint applies one set of rules to a whole file, so a file with `css` and `scss` blocks gets the SCSS config's rules for both; without it, `@include` and values with `$` variables are reported as errors. If you turn on `stylelint-scss`'s `scss/property-no-unknown`, which doesn't read Stylelint's syntax settings, allow `composes` yourself:
 
 ```js
 rules: {
   'scss/property-no-unknown': [true, { ignoreProperties: ['composes'] }],
+},
+```
+
+### Ordering declarations
+
+`composes` must come before a rule's other declarations, including custom properties and the declarations an `@include` adds. With [`stylelint-order`](https://github.com/hudochenkov/stylelint-order), keep it first:
+
+```js
+plugins: ['stylelint-order'],
+rules: {
+  'order/order': [
+    'dollar-variables',
+    'declarations',
+    'custom-properties',
+    { type: 'at-rule', name: 'include' },
+    'rules',
+    'at-rules',
+  ],
+  // Alphabetical, with `composes` first.
+  'order/properties-order': [['composes'], { unspecified: 'bottomAlphabetical' }],
 },
 ```
 

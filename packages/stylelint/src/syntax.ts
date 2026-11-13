@@ -8,6 +8,7 @@ import postcss, {
   type Rule,
   type Syntax,
 } from 'postcss';
+import { createRequire } from 'node:module';
 import postcssScss from 'postcss-scss';
 import type { Lang } from '@pre.style/core/compiler';
 import type { FoundBlock } from '@pre.style/core/find';
@@ -79,6 +80,43 @@ export function placeholder(text: string, index: number): string {
   return out;
 }
 
+const require = createRequire(import.meta.url);
+let html: Syntax | null | undefined;
+
+// postcss-html, an optional peer dependency, or null when it isn't
+// installed.
+function postcssHtml(): Syntax | null {
+  if (html === undefined) {
+    try {
+      const loaded = require('postcss-html') as Syntax & { default?: Syntax };
+      html = loaded.default ?? loaded;
+    } catch {
+      html = null;
+    }
+  }
+  return html;
+}
+
+// The roots postcss-html finds in an Astro component or HTML file: each
+// `<style>` tag and `style` attribute, parsed with its own syntax, which
+// writes it back (`root.source.syntax`).
+function styleRoots(code: string, opts: ProcessOptions): Root[] {
+  const syntax = postcssHtml();
+  if (syntax === null) return [];
+  return [...(syntax.parse!(code, opts) as Document).nodes];
+}
+
+// Where a root's content is in the file. A block's comes from its raws; a
+// `<style>` root's from its source.
+function range(root: Root): [number, number] {
+  const block = blockInfo(root);
+  if (block !== undefined) return [block.start, block.end];
+  return [root.source?.start?.offset ?? 0, root.source?.end?.offset ?? 0];
+}
+
+// The syntax postcss-html parsed a `<style>` root with.
+const styleSyntax = (root: Root) => (root.source as { syntax?: Syntax } | undefined)?.syntax;
+
 function parseFile(
   css: string | { toString(): string },
   opts: ProcessOptions = {},
@@ -101,9 +139,11 @@ function parseFile(
     input: new Input(code, opts),
     start: { offset: 0, line: 1, column: 1 },
   };
-  // Files the build doesn't compile have no blocks to lint.
-  if (!inScope(file, scope)) return document;
-  const { blocks, errors } = findBlocks(file, code, kind);
+  // Files the build doesn't compile have no blocks to lint. Their `<style>`
+  // tags are still linted.
+  const { blocks, errors } = inScope(file, scope)
+    ? findBlocks(file, code, kind)
+    : { blocks: [], errors: [] };
 
   const blanked = blank(code);
   for (const { lang, start, end, expressions, found } of blocks) {
@@ -131,6 +171,10 @@ function parseFile(
     const root = LANGS[lang].parse!(text, { ...opts, document: code } as ProcessOptions) as Root;
     const wrapper = root.first as Rule;
     wrapper.selector = PLACEHOLDER;
+    // The root is the block's content, so warnings on the root itself (and
+    // offsets into its text) point to the block, not the start of the file.
+    root.source!.start = { offset: start, line: found.line, column: found.column };
+    if (wrapper.source?.end !== undefined) root.source!.end = wrapper.source.end;
     const before = code[found.start - 1];
     const quote = kind === 'html' && (before === '"' || before === "'") ? before : undefined;
     (root.raws as RootRaws).preStyle = {
@@ -145,6 +189,17 @@ function parseFile(
     root.parent = document;
     document.nodes.push(root);
   }
+
+  // `<style>` tags (with their `lang`) and `style` attributes, parsed by
+  // postcss-html, so they're linted with the blocks, in file order.
+  const blockRanges = document.nodes.map(range);
+  for (const root of kind === 'script' ? [] : styleRoots(code, opts)) {
+    const [start, end] = range(root);
+    if (blockRanges.some(([from, to]) => start < to && from < end)) continue;
+    root.parent = document;
+    document.nodes.push(root);
+  }
+  document.nodes.sort((a, b) => range(a)[0] - range(b)[0]);
 
   if (errors.length > 0) {
     // Rules only run on roots, so a file with no blocks gets an empty one to
@@ -227,16 +282,22 @@ function stringify(node: AnyNode | Document, builder: Builder): void {
     let at = 0;
     for (const root of node.nodes) {
       const block = info(root);
-      if (block === undefined) continue;
-      builder(code.slice(at, block.start));
-      writeBlock(root, block, builder);
-      at = block.end;
+      const own = styleSyntax(root);
+      // The empty root misused blocks are reported on isn't in the file.
+      if (block === undefined && own === undefined) continue;
+      const [start, end] = range(root);
+      builder(code.slice(at, start));
+      if (block !== undefined) writeBlock(root, block, builder);
+      else own!.stringify!(root, builder);
+      at = end;
     }
     builder(code.slice(at));
     return;
   }
   const root = node.type === 'root' ? node : node.root();
   const block = root.type === 'root' ? info(root) : undefined;
+  const own = root.type === 'root' ? styleSyntax(root) : undefined;
+  if (block === undefined && own !== undefined) return own.stringify!(node, builder);
   if (block !== undefined) {
     if (node === root || node === root.first) return writeBlock(root, block, builder);
     // A single node, as Stylelint writes one for an editor's fix.

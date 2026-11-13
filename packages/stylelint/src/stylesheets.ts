@@ -1,6 +1,7 @@
 import { globSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, extname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import picomatch from 'picomatch';
 import { findInScript, SHEET_IMPORT } from '@pre.style/core/find';
 import { readConfig } from '@pre.style/core/compiler';
 import { fileKind } from './blocks.ts';
@@ -77,16 +78,16 @@ export interface ScopeOptions {
 const list = (value: string | string[] | undefined) =>
   value === undefined ? undefined : [value].flat();
 
-// A package's files: the ones its blocks are linted in (as the build
-// compiles them), the stylesheets they import, and the ones those compose
+// A package's files: which ones its blocks are linted in (as the build
+// compiles them), the stylesheets those import, and the ones those compose
 // from.
 class PackageIndex {
   readonly #dir: string;
   readonly #include: string[];
   readonly #exclude: string[];
   readonly manifest: string | null;
+  readonly #matches: (path: string) => boolean;
   readonly #scanned = new Map<string, Scanned>();
-  #files = new Set<string>();
   #sheets = new Set<string>();
   #checked = -Infinity;
 
@@ -95,6 +96,14 @@ class PackageIndex {
     this.#include = include;
     this.#exclude = exclude;
     this.manifest = manifest;
+    this.#matches = picomatch(include, { ignore: exclude, dot: true });
+  }
+
+  // Whether a file is in the package's `include` and not its `exclude`, by
+  // its path, so a file that isn't saved yet (in an editor) is matched too.
+  includes(file: string): boolean {
+    const path = relative(this.#dir, file);
+    return !path.startsWith('..') && !isAbsolute(path) && this.#matches(path.replaceAll('\\', '/'));
   }
 
   // What a file names, read again only when it changed.
@@ -111,13 +120,10 @@ class PackageIndex {
   #refresh(now: number) {
     if (now - this.#checked < REVALIDATE_MS) return;
     this.#checked = now;
-    const files = new Set<string>();
     const sheets = new Set<string>();
     const pending: string[] = [];
     for (const file of globSync(this.#include, { cwd: this.#dir, exclude: this.#exclude })) {
-      const path = resolve(this.#dir, file);
-      files.add(path);
-      pending.push(...this.#names(path));
+      pending.push(...this.#names(resolve(this.#dir, file)));
     }
     // Stylesheets name more through `composes … from`.
     while (pending.length > 0) {
@@ -126,13 +132,7 @@ class PackageIndex {
       sheets.add(sheet);
       pending.push(...this.#names(sheet));
     }
-    this.#files = files;
     this.#sheets = sheets;
-  }
-
-  files(now = Date.now()): Set<string> {
-    this.#refresh(now);
-    return this.#files;
   }
 
   stylesheets(now = Date.now()): Set<string> {
@@ -170,7 +170,7 @@ function indexFor(file: string, scope: ScopeOptions = {}): PackageIndex | null {
 // any package is linted.
 export function inScope(file: string, scope?: ScopeOptions): boolean {
   const index = indexFor(resolve(file), scope);
-  return index === null || index.files().has(resolve(file));
+  return index === null || index.includes(resolve(file));
 }
 
 // Whether a `.css` or `.scss` file is a pre.style stylesheet: imported with
