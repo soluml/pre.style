@@ -56,7 +56,10 @@ describe('content mapper', () => {
     join(dir, 'package.json'),
     JSON.stringify({ name: 'app', 'pre.style': { prependFiles: { scss: ['mixins.scss'] } } }),
   );
-  writeFileSync(join(dir, 'mixins.scss'), '@mixin utility($name) { .#{$name} { display: none; } }');
+  // Starts with `@use`, which Sass rejects twice in one file.
+  const mixins =
+    "@use 'sass:math';\n@mixin utility($name) { .#{$name} { width: math.div(1px, 2); } }";
+  writeFileSync(join(dir, 'mixins.scss'), mixins);
   writeFileSync(join(dir, 'tsconfig.json'), '{}');
   const client = new Client();
   before(async () => {
@@ -109,6 +112,16 @@ describe('content mapper', () => {
       projectHandle: 'p1',
     });
     assert.equal(result.text, 'export declare const hidden: string;\n');
+  });
+
+  test("a prepended file isn't prepended to itself", async () => {
+    // TypeScript maps every .scss file in the program, prepended ones too.
+    const { result } = await client.request('transform', {
+      fileName: join(dir, 'mixins.scss'),
+      content: mixins,
+      projectHandle: 'p1',
+    });
+    assert.equal(result.diagnostics, undefined);
   });
 
   test('errors in a stylesheet file are diagnostics at their position', async () => {

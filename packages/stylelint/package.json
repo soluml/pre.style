@@ -1,6 +1,6 @@
 {
   "name": "@pre.style/stylelint",
-  "version": "3.1.0-alpha.1",
+  "version": "3.1.0-alpha.2",
   "description": "Stylelint plugin for pre.style: lints css and scss blocks in source files.",
   "keywords": [
     "css-in-js",
@@ -57,7 +57,7 @@
     "test": "node --conditions=pre.style-source --test \"test/**/*.test.ts\""
   },
   "dependencies": {
-    "@pre.style/core": "3.1.0-alpha.7",
+    "@pre.style/core": "3.1.0-alpha.9",
     "oxc-parser": "^0.155.0",
     "picomatch": "^4.0.7",
     "postcss": "^8.5.31",
