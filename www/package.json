@@ -15,7 +15,7 @@
     "astro": "^7.4.2"
   },
   "devDependencies": {
-    "@pre.style/stylelint": "3.1.0-alpha.0",
+    "@pre.style/stylelint": "3.1.0-alpha.1",
     "@pre.style/vite": "3.1.0-alpha.12",
     "browserslist-config-baseline": "^0.5.0",
     "lightningcss": "^1.33.0",
