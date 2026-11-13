@@ -19,6 +19,15 @@ export interface PrependOptions {
   warn?: (message: string) => void;
 }
 
+// `composes`, as pre.style (and CSS Modules) write it, so
+// `property-no-unknown` knows it and `declaration-property-value-no-unknown`
+// checks its value. Core checks the rest (placement, files, and classes).
+export const languageOptions = {
+  syntax: {
+    properties: { composes: '<custom-ident>+ [ from [ <string> | global ] ]?' },
+  },
+} satisfies Config['languageOptions'];
+
 // A path as a glob that matches only it: Stylelint globs override and
 // reference file paths.
 const literal = (path: string) => path.replaceAll('\\', '/').replace(/[*?[\]{}()!+@]/g, '\\$&');
