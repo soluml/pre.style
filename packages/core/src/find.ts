@@ -1,5 +1,5 @@
 import { parseSync } from 'oxc-parser';
-import type { Lang } from '@pre.style/core/compiler';
+import type { Lang } from './compiler/block.ts';
 
 export interface FoundBlock {
   // The whole block, `` css`…` ``, in the source.
@@ -271,8 +271,17 @@ const unwrap = (node: Node): Node => (WRAPPERS.has(node.type) ? unwrap(node.expr
 
 // Finds blocks in a JS or TS file, and imports of stylesheet files. Only
 // `css` and `scss` imported from `@pre.style/core` mark blocks. Returns null
-// when the file imports neither.
-export function findInScript(filename: string, code: string): ScriptAnalysis | null {
+// when the file imports neither. Misused blocks throw, unless `errors` is
+// given: then they're added to it, and the rest of the file is still read.
+export function findInScript(
+  filename: string,
+  code: string,
+  errors?: FindError[],
+): ScriptAnalysis | null {
+  const fail = (error: FindError) => {
+    if (errors === undefined) throw error;
+    errors.push(error);
+  };
   const { program } = parseSync(filename, code);
   const locate = locator(code);
 
@@ -441,11 +450,14 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
     }
     if (parent?.type !== 'TaggedTemplateExpression' || parent.tag !== node) {
       const { line, column } = locate(node.start);
-      throw new FindError(
-        `\`${node.name}\` from pre.style can only be used as a tagged template (${node.name}\`…\`).`,
-        line,
-        column,
+      fail(
+        new FindError(
+          `\`${node.name}\` from pre.style can only be used as a tagged template (${node.name}\`…\`).`,
+          line,
+          column,
+        ),
       );
+      return;
     }
     const { quasi } = parent;
     // The block's code starts after the opening backtick.
@@ -479,10 +491,12 @@ export function findInScript(filename: string, code: string): ScriptAnalysis | n
     for (const expression of interpolation?.expressions ?? [])
       for (const inner of blocks)
         if (expression.start <= inner.start && inner.end <= expression.end)
-          throw new FindError(
-            "A block can't be used in another block's `${…}`. To combine blocks, use `cn`.",
-            inner.line,
-            inner.column,
+          fail(
+            new FindError(
+              "A block can't be used in another block's `${…}`. To combine blocks, use `cn`.",
+              inner.line,
+              inner.column,
+            ),
           );
 
   // The stylesheet import a local name is bound to.

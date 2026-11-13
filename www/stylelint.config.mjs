@@ -1,0 +1,36 @@
+// Lints the site's blocks, stylesheets, and Astro `<style>` tags.
+//
+// `stylelint-config-standard-scss` adds Sass support to the standard config,
+// for `scss` blocks. pre.style's config comes last, so its syntax is the one
+// used.
+export default {
+  extends: [
+    'stylelint-config-standard',
+    'stylelint-config-standard-scss',
+    'stylelint-config-html/astro',
+    'stylelint-prettier/recommended',
+    '@pre.style/stylelint/config',
+  ],
+  plugins: ['stylelint-order', 'stylelint-no-unsupported-browser-features'],
+  rules: {
+    // Sass variables, then declarations, custom properties, mixins, nested
+    // rules, and at-rules. pre.style requires `composes` before any other
+    // declaration, so custom properties and `@include` (whose declarations
+    // would come first) go after declarations.
+    'order/order': [
+      'dollar-variables',
+      'declarations',
+      'custom-properties',
+      { type: 'at-rule', name: 'include' },
+      'rules',
+      'at-rules',
+    ],
+    // Alphabetical, except `composes`, which must come first.
+    'order/properties-order': [['composes'], { unspecified: 'bottomAlphabetical' }],
+    // The `browserslist` field's targets (Baseline).
+    'plugin/no-unsupported-browser-features': [
+      true,
+      { severity: 'warning', ignorePartialSupport: true },
+    ],
+  },
+};

@@ -12,7 +12,7 @@ const title = css`
   line-height: 1.2;
   margin: 0 0 calc(var(--space) * 2);
 
-  @media (min-width: 768px) {
+  @media (width >= 768px) {
     font-size: 2.75rem;
   }
 `;
@@ -47,7 +47,7 @@ const card = css`
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
   }
 
   & > h2 {

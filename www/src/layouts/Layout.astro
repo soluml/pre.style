@@ -13,17 +13,15 @@ interface Props {
 const { title, description } = Astro.props;
 
 const body = scss`
-  --bg-grid-color: rgb(0 0 0 / .135);
-  --bg-grid-gap: 40px;
-  $gridStops: var(--bg-grid-color) 0px, var(--bg-grid-color) 1px, transparent 1px, transparent var(--bg-grid-gap);
+  $grid-stops: var(--bg-grid-color) 0px, var(--bg-grid-color) 1px, transparent 1px, transparent var(--bg-grid-gap);
 
   background-color: #da5b06;
   background-image:    
-    repeating-linear-gradient(to bottom, $gridStops),
-    repeating-linear-gradient(to right, $gridStops),
-    linear-gradient(165deg, oklch(100% 0.24 77), oklch(92% 0.41 64));
+    repeating-linear-gradient(to bottom, $grid-stops),
+    repeating-linear-gradient(to right, $grid-stops),
+    linear-gradient(165deg, oklch(100% 0.24 77deg), oklch(92% 0.41 64deg));
   background-position: top, left;
-  color: rgb(0 0 0 / 0.85);
+  color: rgb(0 0 0 / 85%);
   display: flex;
   flex-direction: column;
   font-family: var(--font-geist);
@@ -31,6 +29,9 @@ const body = scss`
   margin: 0;
   min-height: 100%;
   width: 100%;
+
+  --bg-grid-color: rgb(0 0 0 / 13.5%);
+  --bg-grid-gap: 40px;
 
   // &::before {
   //   animation: fadeInOut 1.06s ease-in-out infinite;

@@ -1,0 +1,17 @@
+{
+  "name": "app",
+  "private": true,
+  "dependencies": {
+    "ui": "*"
+  },
+  "pre.style": {
+    "prependFiles": {
+      "css": [
+        "tokens.css"
+      ],
+      "scss": [
+        "mixins.scss"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "compile",
+  "private": true,
+  "type": "module",
+  "pre.style": {
+    "prependFiles": {
+      "scss": [
+        "mixins.scss"
+      ]
+    }
+  }
+}

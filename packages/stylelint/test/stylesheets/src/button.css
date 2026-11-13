@@ -1,0 +1,8 @@
+.button {
+  composes: chip from './chip.css';
+  color: red;
+}
+
+.bad {
+  composes: 1px;
+}

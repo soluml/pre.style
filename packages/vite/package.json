@@ -1,6 +1,6 @@
 {
   "name": "@pre.style/vite",
-  "version": "3.1.0-alpha.11",
+  "version": "3.1.0-alpha.12",
   "description": "Vite plugin for pre.style.",
   "keywords": [
     "atomic-css",
@@ -43,13 +43,13 @@
   "scripts": {
     "prepack": "npm run build -w @pre.style/core -w @pre.style/vite && cp ../../README.md ../../LICENSE .",
     "postpack": "rm README.md LICENSE",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc",
     "test": "node --conditions=pre.style-source --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@jridgewell/sourcemap-codec": "^1.6.0",
-    "@pre.style/core": "3.1.0-alpha.6",
+    "@pre.style/core": "3.1.0-alpha.7",
     "magic-string": "^1.4.3",
     "oxc-parser": "^0.155.0"
   },

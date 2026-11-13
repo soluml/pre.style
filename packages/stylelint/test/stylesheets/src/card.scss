@@ -1,0 +1,6 @@
+$gap: 4px;
+
+.card {
+  composes: base from global;
+  margin: $gap;
+}

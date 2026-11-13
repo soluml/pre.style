@@ -1,0 +1,88 @@
+{
+  "name": "@pre.style/stylelint",
+  "version": "3.1.0-alpha.1",
+  "description": "Stylelint plugin for pre.style: lints css and scss blocks in source files.",
+  "keywords": [
+    "css-in-js",
+    "pre.style",
+    "stylelint",
+    "stylelint-plugin",
+    "stylelint-syntax"
+  ],
+  "homepage": "https://pre.style",
+  "bugs": {
+    "url": "https://github.com/soluml/pre.style/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Benjamin Solum",
+    "email": "benjamin@soluml.com",
+    "url": "https://soluml.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soluml/pre.style/",
+    "directory": "packages/stylelint"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "pre.style-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config": {
+      "pre.style-source": "./src/default-config.ts",
+      "types": "./dist/default-config.d.ts",
+      "default": "./dist/default-config.js"
+    },
+    "./syntax": {
+      "pre.style-source": "./src/syntax.ts",
+      "types": "./dist/syntax.d.ts",
+      "default": "./dist/syntax.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "scripts": {
+    "prepack": "npm run build -w @pre.style/core -w @pre.style/stylelint && cp ../../README.md ../../LICENSE .",
+    "postpack": "rm README.md LICENSE",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc",
+    "test": "node --conditions=pre.style-source --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@pre.style/core": "3.1.0-alpha.7",
+    "oxc-parser": "^0.155.0",
+    "picomatch": "^4.0.7",
+    "postcss": "^8.5.31",
+    "postcss-scss": "^4.0.9"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3",
+    "postcss-html": "^2.0.0",
+    "stylelint": "^18.0.0"
+  },
+  "peerDependencies": {
+    "lightningcss": "^1.33.0",
+    "postcss-html": "^2.0.0",
+    "sass": "^1.106.1",
+    "stylelint": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "postcss-html": {
+      "optional": true
+    },
+    "sass": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

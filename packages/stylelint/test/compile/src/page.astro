@@ -1,0 +1,11 @@
+---
+import { css } from '@pre.style/core';
+const width = 1;
+const server = css`width: ${width}px;`;
+---
+<div class={server}></div>
+<script>
+  import { css } from '@pre.style/core';
+  const width = 2;
+  document.body.className = css`width: ${width}px;`;
+</script>

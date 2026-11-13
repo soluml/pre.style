@@ -1,0 +1,9 @@
+{
+  "name": "ui",
+  "private": true,
+  "pre.style": {
+    "prependFiles": [
+      "theme.css"
+    ]
+  }
+}

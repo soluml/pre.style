@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findInComponent, findInScript } from '../src/find.ts';
+import { FindError, findInComponent, findInScript } from '../src/find.ts';
 
 // Whether each `cn` call is resolved at build time, by the label in its
 // last argument.
@@ -265,5 +265,30 @@ const $$Page = $$createComponent(($$result) => {
         { line: 6, column: 47, component: true, syntax: 'props', after: '"c' },
       ],
     );
+  });
+});
+
+describe('misused blocks', () => {
+  const code = `import { css } from '@pre.style/core';
+const tag = css;
+const a = css\`color: \${css\`color: red;\`};\`;
+const b = css\`color: blue;\`;
+`;
+
+  test('throw by default', () => {
+    assert.throws(() => findInScript('test.ts', code), FindError);
+  });
+
+  test('are collected, and the rest of the file is read, when errors are given', () => {
+    const errors: FindError[] = [];
+    const analysis = findInScript('test.ts', code, errors)!;
+    assert.deepEqual(
+      errors.map(({ line, column }) => [line, column]),
+      [
+        [2, 13],
+        [3, 28],
+      ],
+    );
+    assert.equal(analysis.blocks.length, 3);
   });
 });
