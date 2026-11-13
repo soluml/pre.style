@@ -24,6 +24,8 @@ interface BlockInfo {
   // The block's content offsets in the file.
   start: number;
   end: number;
+  // Each `${…}`'s placeholder, and the text it replaced.
+  expressions: [placeholder: string, text: string][];
 }
 
 type RootRaws = Root['raws'] & { preStyle?: BlockInfo; preStyleLang?: Lang };
@@ -33,6 +35,24 @@ const LANGS: Record<Lang, Syntax> = { css: postcss, scss: postcssScss };
 // Everything but line breaks, as spaces, so a block parsed from a copy of
 // the file has the file's offsets, lines, and columns.
 const blank = (code: string) => code.replace(/[^\r\n]/g, ' ');
+
+// A `${…}`'s placeholder: `$`, an id, and underscores, as long as the text
+// it replaces and with its line breaks, so offsets hold. Value rules skip a
+// value starting with `$`, as for a Sass variable. The id is `index` in
+// letters (`a`, `b`, …, `ba`), since a digit would start a number (`$3__` is
+// `$` and a `3__` dimension, an unknown unit). It's written around line
+// breaks, so a multi-line `${…}` keeps all of it: the shortest `${…}` has 4
+// other characters, room for 17,576 ids.
+export function placeholder(text: string, index: number): string {
+  const id = [...index.toString(26)]
+    .map((digit) => String.fromCharCode(97 + parseInt(digit, 26)))
+    .join('');
+  const fill = `$${id}`;
+  let out = '';
+  let used = 0;
+  for (const char of text) out += char === '\n' || char === '\r' ? char : (fill[used++] ?? '_');
+  return out;
+}
 
 function parseFile(css: string | { toString(): string }, opts: ProcessOptions = {}) {
   const code = css.toString();
@@ -56,14 +76,32 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
   if (blocks.length === 0) return document;
 
   const blanked = blank(code);
-  for (const { lang, start, end } of blocks) {
-    // The content, with a `{` on its opening backtick and a `}` on its
-    // closing one: a rule with no selector, whose body is the block.
-    const text = `${blanked.slice(0, start - 1)}{${code.slice(start, end)}}${blanked.slice(end + 1)}`;
+  for (const { lang, start, end, expressions } of blocks) {
+    // The content, with each `${…}` replaced by its placeholder. Ids that
+    // already appear in the block are skipped, so each placeholder is
+    // unique and writing back is a plain replacement.
+    const replaced: BlockInfo['expressions'] = [];
+    const original = code.slice(start, end);
+    let content = '';
+    let at = start;
+    let index = 0;
+    for (const expression of expressions) {
+      const text = code.slice(expression.start, expression.end);
+      let replacement = placeholder(text, index++);
+      while (original.includes(replacement) || replaced.some(([used]) => used === replacement))
+        replacement = placeholder(text, index++);
+      content += code.slice(at, expression.start) + replacement;
+      replaced.push([replacement, text]);
+      at = expression.end;
+    }
+    content += code.slice(at, end);
+    // With a `{` on its opening backtick and a `}` on its closing one: a
+    // rule with no selector, whose body is the block.
+    const text = `${blanked.slice(0, start - 1)}{${content}}${blanked.slice(end + 1)}`;
     const root = LANGS[lang].parse!(text, { ...opts, document: code } as ProcessOptions) as Root;
     const wrapper = root.first as Rule;
     wrapper.selector = PLACEHOLDER;
-    (root.raws as RootRaws).preStyle = { lang, start, end };
+    (root.raws as RootRaws).preStyle = { lang, start, end, expressions: replaced };
     root.parent = document;
     document.nodes.push(root);
   }
@@ -72,14 +110,22 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
 
 const info = (root: Root) => (root.raws as RootRaws).preStyle;
 
+// Puts each `${…}` back in place of its placeholder.
+function restore(part: string, { expressions }: BlockInfo): string {
+  let out = part;
+  for (const [replacement, text] of expressions)
+    if (out.includes(replacement)) out = out.replaceAll(replacement, () => text);
+  return out;
+}
+
 // Writes a block's content: its wrapper rule without the selector and
-// braces, which aren't in the file.
-function writeBlock(root: Root, lang: Lang, builder: Builder) {
+// braces, which aren't in the file, and with its `${…}` restored.
+function writeBlock(root: Root, block: BlockInfo, builder: Builder) {
   const wrapper = root.first;
   if (wrapper === undefined) return;
-  LANGS[lang].stringify!(wrapper, (part, node, type) => {
+  LANGS[block.lang].stringify!(wrapper, (part, node, type) => {
     if (node === wrapper && (type === 'start' || type === 'end')) return;
-    builder(part, node, type);
+    builder(restore(part, block), node, type);
   });
 }
 
@@ -91,7 +137,7 @@ function stringify(node: AnyNode | Document, builder: Builder): void {
       const block = info(root);
       if (block === undefined) continue;
       builder(code.slice(at, block.start));
-      writeBlock(root, block.lang, builder);
+      writeBlock(root, block, builder);
       at = block.end;
     }
     builder(code.slice(at));
@@ -99,12 +145,13 @@ function stringify(node: AnyNode | Document, builder: Builder): void {
   }
   const root = node.type === 'root' ? node : node.root();
   const block = root.type === 'root' ? info(root) : undefined;
-  if (block !== undefined && (node === root || node === root.first)) {
-    writeBlock(root, block.lang, builder);
+  if (block !== undefined) {
+    if (node === root || node === root.first) writeBlock(root, block, builder);
+    else
+      LANGS[block.lang].stringify!(node, (part, ...rest) => builder(restore(part, block), ...rest));
     return;
   }
-  const lang =
-    block?.lang ?? (root.type === 'root' ? (root.raws as RootRaws).preStyleLang : undefined);
+  const lang = root.type === 'root' ? (root.raws as RootRaws).preStyleLang : undefined;
   LANGS[lang ?? 'css'].stringify!(node, builder);
 }
 

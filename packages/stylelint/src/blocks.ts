@@ -30,7 +30,37 @@ export interface LintBlock {
   // The content's offsets in the file.
   start: number;
   end: number;
+  // Each `${…}`, from `$` to `}`, as offsets in the file.
+  expressions: { start: number; end: number }[];
   found: FoundBlock;
+}
+
+// The offset of the `}` that closes an expression ending at `from`, after
+// whitespace and comments.
+function closingBrace(code: string, from: number): number {
+  let i = from;
+  while (i < code.length && code[i] !== '}') {
+    if (code.startsWith('/*', i)) i = code.indexOf('*/', i + 2) + 2;
+    else if (code.startsWith('//', i)) i = code.indexOf('\n', i);
+    else i++;
+    if (i <= 0) return code.length;
+  }
+  return i;
+}
+
+// Where each `${…}` of a block is: the text before each one is known, and
+// each ends at the `}` after its expression.
+function expressionSpans(code: string, start: number, block: FoundBlock) {
+  const spans: LintBlock['expressions'] = [];
+  const { strings, expressions } = block.interpolation ?? { strings: [], expressions: [] };
+  let at = start;
+  expressions.forEach((expression, i) => {
+    at += strings[i].length;
+    const end = closingBrace(code, expression.end) + 1;
+    spans.push({ start: at, end });
+    at = end;
+  });
+  return spans;
 }
 
 // Finds a source file's blocks the way the build does: imports decide
@@ -61,12 +91,12 @@ export function findBlocks(
   const blocks: LintBlock[] = [];
   let last = 0;
   for (const block of found.toSorted((a, b) => a.start - b.start)) {
-    // TODO(pass 2): blocks with `${…}` get placeholders.
-    if (block.interpolation) continue;
     // A block inside another's `${…}` is an error the finder reports.
     if (block.start < last) continue;
     const end = block.end - 1;
-    blocks.push({ lang: block.lang, start: end - block.code.length, end, found: block });
+    const start = end - block.code.length;
+    const expressions = expressionSpans(code, start, block);
+    blocks.push({ lang: block.lang, start, end, expressions, found: block });
     last = block.end;
   }
   return { blocks, errors };
