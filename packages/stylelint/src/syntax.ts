@@ -31,6 +31,8 @@ export interface BlockInfo {
   found: FoundBlock;
   // The kind of file it's in.
   kind: 'script' | 'component' | 'html';
+  // In HTML, the quote around the attribute it's in.
+  quote?: string;
 }
 
 // Blocks used other than the build allows (`css` not used as a tag, or a
@@ -122,7 +124,17 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
     const root = LANGS[lang].parse!(text, { ...opts, document: code } as ProcessOptions) as Root;
     const wrapper = root.first as Rule;
     wrapper.selector = PLACEHOLDER;
-    (root.raws as RootRaws).preStyle = { lang, start, end, expressions: replaced, found, kind };
+    const before = code[found.start - 1];
+    const quote = kind === 'html' && (before === '"' || before === "'") ? before : undefined;
+    (root.raws as RootRaws).preStyle = {
+      lang,
+      start,
+      end,
+      expressions: replaced,
+      found,
+      kind,
+      quote,
+    };
     root.parent = document;
     document.nodes.push(root);
   }
@@ -152,15 +164,54 @@ function restore(part: string, { expressions }: BlockInfo): string {
   return out;
 }
 
+// Escapes what a fix wrote that would end a template literal or start an
+// expression: a backtick or `${` not already escaped. The file's own text
+// can't have either (its `${…}` are placeholders here), so it's unchanged.
+// Backslashes can't be told apart from the file's own, so they're written
+// as they are; no fix inserts one.
+export function escapeTemplate(text: string): string {
+  let out = '';
+  let slashes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char !== '\\') {
+      if (slashes % 2 === 0 && (char === '`' || (char === '$' && text[i + 1] === '{'))) out += '\\';
+      slashes = 0;
+    } else slashes++;
+    out += char;
+  }
+  return out;
+}
+
+// CSS as it's written back into the block's source. In a script or
+// component, it's a template literal's text. In HTML it's an attribute
+// value, which has no escapes the build reads, so CSS with a backtick or the
+// attribute's quote can't be written, and `original` is kept.
+function encode(css: string, block: BlockInfo, original: () => string): string {
+  if (block.kind !== 'html') return restore(escapeTemplate(css), block);
+  if (css.includes('`') || (block.quote !== undefined && css.includes(block.quote)))
+    return original();
+  return css;
+}
+
+// The file's text, which each block's root was parsed with.
+const fileText = (root: Root) =>
+  (root.source?.input as { document?: string } | undefined)?.document ?? '';
+
 // Writes a block's content: its wrapper rule without the selector and
 // braces, which aren't in the file, and with its `${…}` restored.
 function writeBlock(root: Root, block: BlockInfo, builder: Builder) {
   const wrapper = root.first;
   if (wrapper === undefined) return;
+  let css = '';
   LANGS[block.lang].stringify!(wrapper, (part, node, type) => {
     if (node === wrapper && (type === 'start' || type === 'end')) return;
-    builder(restore(part, block), node, type);
+    css += part;
   });
+  builder(
+    encode(css, block, () => fileText(root).slice(block.start, block.end)),
+    root,
+  );
 }
 
 function stringify(node: AnyNode | Document, builder: Builder): void {
@@ -180,9 +231,21 @@ function stringify(node: AnyNode | Document, builder: Builder): void {
   const root = node.type === 'root' ? node : node.root();
   const block = root.type === 'root' ? info(root) : undefined;
   if (block !== undefined) {
-    if (node === root || node === root.first) writeBlock(root, block, builder);
-    else
-      LANGS[block.lang].stringify!(node, (part, ...rest) => builder(restore(part, block), ...rest));
+    if (node === root || node === root.first) return writeBlock(root, block, builder);
+    // A single node, as Stylelint writes one for an editor's fix.
+    let css = '';
+    LANGS[block.lang].stringify!(node, (part) => (css += part));
+    // Its text in the file, if it has to be kept. A declaration's or
+    // statement at-rule's position includes its `;`, which its own text
+    // doesn't (its parent writes it).
+    const original = () => {
+      const { start, end } = node.source ?? {};
+      const text = fileText(root).slice(start?.offset ?? 0, end?.offset ?? 0);
+      const statement =
+        node.type === 'decl' || (node.type === 'atrule' && node.nodes === undefined);
+      return statement && text.endsWith(';') ? text.slice(0, -1) : text;
+    };
+    builder(encode(css, block, original), node);
     return;
   }
   const lang = root.type === 'root' ? (root.raws as RootRaws).preStyleLang : undefined;
