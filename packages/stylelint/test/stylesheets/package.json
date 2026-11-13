@@ -1,0 +1,7 @@
+{
+  "name": "sheets",
+  "private": true,
+  "pre.style": {
+    "exclude": "src/excluded/**"
+  }
+}

@@ -1,0 +1,4 @@
+.global {
+  color: red;
+  composes: anything from global;
+}

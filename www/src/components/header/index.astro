@@ -5,16 +5,16 @@ import Logo from '../../components/logo/index.astro';
 import GithubIcon from '~icons/icomoon-free/github';
 
 const header = scss`
-  @include box-grid($size: 72);
-
-  align-items: center;
   align-content: center;
+  align-items: center;
   background-color: var(--bg);
   display: grid;
   grid-template-columns: minmax(var(--gap), 1fr) minmax(0, 77.5rem) minmax(var(--gap), 1fr);
 
+  @include box-grid($size: 72);
+
   a {
-    color: currentColor;
+    color: currentcolor;
   }
 `;
 
@@ -24,9 +24,9 @@ const cnt = css`
   gap: var(--gap);
   grid-column: 2;
   justify-content: space-between;
+  max-width: 100%;
   min-width: fit-content;
   width: 30rem;
-  max-width: 100%;
 `;
 
 const logoLink = css`
@@ -42,8 +42,8 @@ const logoLink = css`
 
 const nav = css`
   display: flex;
-  gap: calc(var(--gap) / 2);
   font-weight: 600;
+  gap: calc(var(--gap) / 2);
 
   @media (width >= 500px) {
     gap: var(--gap);

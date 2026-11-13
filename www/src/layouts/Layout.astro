@@ -15,16 +15,17 @@ interface Props {
 const { title, description } = Astro.props;
 
 const body = scss`
-  --bg-grid-gap: 1.5rem;
-  $gridStops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
+  $grid-stops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
 
   background-image:    
-    repeating-linear-gradient(to bottom, $gridStops),
-    repeating-linear-gradient(to right, $gridStops);
+    repeating-linear-gradient(to bottom, $grid-stops),
+    repeating-linear-gradient(to right, $grid-stops);
   background-position: top, left;
   display: flex;
   flex-direction: column;
-  font-family: var(--font-dm);  
+  font-family: var(--font-dm);
+
+  --bg-grid-gap: 1.5rem;  
 
   // &::before {
   //   animation: fadeInOut 1.06s ease-in-out infinite;

@@ -1,0 +1,19 @@
+---
+import { css, scss } from '@pre.style/core';
+const card = css`
+  margin: 0px;
+`;
+const fancy = scss`
+  $gap: 4px;
+  padding: $gap;
+  @include ring;
+`;
+---
+<div class={card} style="margin: 0px"></div>
+<style>
+  .plain { margin: 0px; }
+</style>
+<style lang="scss">
+  $x: 0px;
+  .sass { padding: 0px $x; }
+</style>

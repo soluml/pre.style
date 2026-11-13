@@ -1,0 +1,15 @@
+---
+import { css } from '@pre.style/core';
+const card = css`
+  color: blue;
+`;
+---
+<div class={card}>
+  <span class={css`margin: 0px;`}>Card</span>
+</div>
+<script>
+  import { scss } from '@pre.style/core';
+  document.body.className = scss`
+    padding: 1px;
+  `;
+</script>

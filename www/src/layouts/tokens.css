@@ -19,138 +19,141 @@
   --step-6: clamp(2.4883rem, 2.1255rem + 1.6873vw, 3.4332rem);
 
   /* sand · hue 75 */
-  --sand-50: oklch(0.985 0.01 75);
-  --sand-100: oklch(0.968 0.018 75);
-  --sand-200: oklch(0.935 0.024 75);
-  --sand-300: oklch(0.885 0.028 75);
-  --sand-400: oklch(0.78 0.032 75);
-  --sand-500: oklch(0.64 0.036 75);
-  --sand-600: oklch(0.52 0.04 75);
-  --sand-700: oklch(0.42 0.044 75);
-  --sand-800: oklch(0.33 0.04 75);
-  --sand-900: oklch(0.25 0.034 75);
-  --sand-950: oklch(0.19 0.026 75);
+  --sand-50: oklch(98.5% 0.01 75deg);
+  --sand-100: oklch(96.8% 0.018 75deg);
+  --sand-200: oklch(93.5% 0.024 75deg);
+  --sand-300: oklch(88.5% 0.028 75deg);
+  --sand-400: oklch(78% 0.032 75deg);
+  --sand-500: oklch(64% 0.036 75deg);
+  --sand-600: oklch(52% 0.04 75deg);
+  --sand-700: oklch(42% 0.044 75deg);
+  --sand-800: oklch(33% 0.04 75deg);
+  --sand-900: oklch(25% 0.034 75deg);
+  --sand-950: oklch(19% 0.026 75deg);
 
   /* brand · hue 62 */
-  --brand-50: oklch(0.98 0.014 62);
-  --brand-100: oklch(0.955 0.035 62);
-  --brand-200: oklch(0.92 0.065 62);
-  --brand-300: oklch(0.88 0.101 62);
-  --brand-400: oklch(0.835 0.144 62);
-  --brand-500: oklch(0.79 0.19 62);
-  --brand-600: oklch(0.7 0.182 62);
-  --brand-700: oklch(0.59 0.153 62);
-  --brand-800: oklch(0.48 0.125 62);
-  --brand-900: oklch(0.39 0.095 62);
-  --brand-950: oklch(0.28 0.065 62);
+  --brand-50: oklch(98% 0.014 62deg);
+  --brand-100: oklch(95.5% 0.035 62deg);
+  --brand-200: oklch(92% 0.065 62deg);
+  --brand-300: oklch(88% 0.101 62deg);
+  --brand-400: oklch(83.5% 0.144 62deg);
+  --brand-500: oklch(79% 0.19 62deg);
+  --brand-600: oklch(70% 0.182 62deg);
+  --brand-700: oklch(59% 0.153 62deg);
+  --brand-800: oklch(48% 0.125 62deg);
+  --brand-900: oklch(39% 0.095 62deg);
+  --brand-950: oklch(28% 0.065 62deg);
 
   /* violet · hue 295 */
-  --violet-50: oklch(0.97 0.016 295);
-  --violet-100: oklch(0.94 0.033 295);
-  --violet-200: oklch(0.89 0.064 295);
-  --violet-300: oklch(0.82 0.109 295);
-  --violet-400: oklch(0.72 0.176 295);
-  --violet-500: oklch(0.62 0.248 295);
-  --violet-600: oklch(0.53 0.29 295);
-  --violet-700: oklch(0.45 0.25 295);
-  --violet-800: oklch(0.37 0.2 295);
-  --violet-900: oklch(0.3 0.14 295);
-  --violet-950: oklch(0.22 0.09 295);
+  --violet-50: oklch(97% 0.016 295deg);
+  --violet-100: oklch(94% 0.033 295deg);
+  --violet-200: oklch(89% 0.064 295deg);
+  --violet-300: oklch(82% 0.109 295deg);
+  --violet-400: oklch(72% 0.176 295deg);
+  --violet-500: oklch(62% 0.248 295deg);
+  --violet-600: oklch(53% 0.29 295deg);
+  --violet-700: oklch(45% 0.25 295deg);
+  --violet-800: oklch(37% 0.2 295deg);
+  --violet-900: oklch(30% 0.14 295deg);
+  --violet-950: oklch(22% 0.09 295deg);
 
   /* blue · hue 250 */
-  --blue-50: oklch(0.97 0.016 250);
-  --blue-100: oklch(0.94 0.031 250);
-  --blue-200: oklch(0.89 0.059 250);
-  --blue-300: oklch(0.83 0.094 250);
-  --blue-400: oklch(0.75 0.143 250);
-  --blue-500: oklch(0.67 0.194 250);
-  --blue-600: oklch(0.58 0.21 250);
-  --blue-700: oklch(0.49 0.177 250);
-  --blue-800: oklch(0.41 0.15 250);
-  --blue-900: oklch(0.33 0.11 250);
-  --blue-950: oklch(0.24 0.07 250);
+  --blue-50: oklch(97% 0.016 250deg);
+  --blue-100: oklch(94% 0.031 250deg);
+  --blue-200: oklch(89% 0.059 250deg);
+  --blue-300: oklch(83% 0.094 250deg);
+  --blue-400: oklch(75% 0.143 250deg);
+  --blue-500: oklch(67% 0.194 250deg);
+  --blue-600: oklch(58% 0.21 250deg);
+  --blue-700: oklch(49% 0.177 250deg);
+  --blue-800: oklch(41% 0.15 250deg);
+  --blue-900: oklch(33% 0.11 250deg);
+  --blue-950: oklch(24% 0.07 250deg);
 
   /* cyan · hue 205 */
-  --cyan-50: oklch(0.98 0.016 205);
-  --cyan-100: oklch(0.955 0.04 205);
-  --cyan-200: oklch(0.92 0.07 205);
-  --cyan-300: oklch(0.88 0.11 205);
-  --cyan-400: oklch(0.84 0.13 205);
-  --cyan-500: oklch(0.79 0.135 205);
-  --cyan-600: oklch(0.7 0.125 205);
-  --cyan-700: oklch(0.6 0.11 205);
-  --cyan-800: oklch(0.5 0.09 205);
-  --cyan-900: oklch(0.41 0.07 205);
-  --cyan-950: oklch(0.3 0.05 205);
+  --cyan-50: oklch(98% 0.016 205deg);
+  --cyan-100: oklch(95.5% 0.04 205deg);
+  --cyan-200: oklch(92% 0.07 205deg);
+  --cyan-300: oklch(88% 0.11 205deg);
+  --cyan-400: oklch(84% 0.13 205deg);
+  --cyan-500: oklch(79% 0.135 205deg);
+  --cyan-600: oklch(70% 0.125 205deg);
+  --cyan-700: oklch(60% 0.11 205deg);
+  --cyan-800: oklch(50% 0.09 205deg);
+  --cyan-900: oklch(41% 0.07 205deg);
+  --cyan-950: oklch(30% 0.05 205deg);
 
   /* pink · hue 8 */
-  --pink-50: oklch(0.975 0.016 8);
-  --pink-100: oklch(0.95 0.032 8);
-  --pink-200: oklch(0.905 0.065 8);
-  --pink-300: oklch(0.85 0.108 8);
-  --pink-400: oklch(0.775 0.176 8);
-  --pink-500: oklch(0.7 0.225 8);
-  --pink-600: oklch(0.62 0.23 8);
-  --pink-700: oklch(0.53 0.21 8);
-  --pink-800: oklch(0.44 0.17 8);
-  --pink-900: oklch(0.35 0.12 8);
-  --pink-950: oklch(0.26 0.08 8);
+  --pink-50: oklch(97.5% 0.016 8deg);
+  --pink-100: oklch(95% 0.032 8deg);
+  --pink-200: oklch(90.5% 0.065 8deg);
+  --pink-300: oklch(85% 0.108 8deg);
+  --pink-400: oklch(77.5% 0.176 8deg);
+  --pink-500: oklch(70% 0.225 8deg);
+  --pink-600: oklch(62% 0.23 8deg);
+  --pink-700: oklch(53% 0.21 8deg);
+  --pink-800: oklch(44% 0.17 8deg);
+  --pink-900: oklch(35% 0.12 8deg);
+  --pink-950: oklch(26% 0.08 8deg);
 
   /* green · hue 150 */
-  --green-50: oklch(0.98 0.025 150);
-  --green-100: oklch(0.955 0.055 150);
-  --green-200: oklch(0.915 0.11 150);
-  --green-300: oklch(0.865 0.17 150);
-  --green-400: oklch(0.8 0.205 150);
-  --green-500: oklch(0.73 0.2 150);
-  --green-600: oklch(0.64 0.17 150);
-  --green-700: oklch(0.54 0.14 150);
-  --green-800: oklch(0.45 0.11 150);
-  --green-900: oklch(0.37 0.085 150);
-  --green-950: oklch(0.27 0.06 150);
+  --green-50: oklch(98% 0.025 150deg);
+  --green-100: oklch(95.5% 0.055 150deg);
+  --green-200: oklch(91.5% 0.11 150deg);
+  --green-300: oklch(86.5% 0.17 150deg);
+  --green-400: oklch(80% 0.205 150deg);
+  --green-500: oklch(73% 0.2 150deg);
+  --green-600: oklch(64% 0.17 150deg);
+  --green-700: oklch(54% 0.14 150deg);
+  --green-800: oklch(45% 0.11 150deg);
+  --green-900: oklch(37% 0.085 150deg);
+  --green-950: oklch(27% 0.06 150deg);
 
   /* red · hue 25 */
-  --red-50: oklch(0.975 0.015 25);
-  --red-100: oklch(0.95 0.03 25);
-  --red-200: oklch(0.905 0.062 25);
-  --red-300: oklch(0.845 0.108 25);
-  --red-400: oklch(0.765 0.177 25);
-  --red-500: oklch(0.69 0.225 25);
-  --red-600: oklch(0.61 0.235 25);
-  --red-700: oklch(0.53 0.205 25);
-  --red-800: oklch(0.44 0.16 25);
-  --red-900: oklch(0.36 0.115 25);
-  --red-950: oklch(0.26 0.08 25);
+  --red-50: oklch(97.5% 0.015 25deg);
+  --red-100: oklch(95% 0.03 25deg);
+  --red-200: oklch(90.5% 0.062 25deg);
+  --red-300: oklch(84.5% 0.108 25deg);
+  --red-400: oklch(76.5% 0.177 25deg);
+  --red-500: oklch(69% 0.225 25deg);
+  --red-600: oklch(61% 0.235 25deg);
+  --red-700: oklch(53% 0.205 25deg);
+  --red-800: oklch(44% 0.16 25deg);
+  --red-900: oklch(36% 0.115 25deg);
+  --red-950: oklch(26% 0.08 25deg);
 
   /* ---------- Semantic tokens ---------- */
+
   /* Each token is light-dark(<light>, <dark>), resolved by the color-scheme of
    the element that uses it: the OS preference by default, or data-theme to
    force one, on the root or any subtree. */
-  --bg: light-dark(oklch(0.975 0.02 85), oklch(0.215 0.022 55));
-  --bg-grid: light-dark(oklch(0.9 0.03 80 / 0.55), oklch(0.32 0.03 55 / 0.55));
-  --surface: light-dark(oklch(0.992 0.008 85), oklch(0.255 0.026 55));
-  --surface-2: light-dark(oklch(0.955 0.022 82), oklch(0.285 0.028 55));
-  --border: light-dark(oklch(0.8 0.04 70), oklch(0.42 0.04 55));
-  --border-strong: light-dark(oklch(0.3 0.05 45), oklch(0.93 0.02 80));
-  --text: light-dark(oklch(0.24 0.055 45), oklch(0.975 0.015 85));
-  --text-muted: light-dark(oklch(0.45 0.045 55), oklch(0.8 0.03 75));
-  --text-faint: light-dark(oklch(0.6 0.035 65), oklch(0.64 0.03 70));
+  --bg: light-dark(oklch(97.5% 0.02 85deg), oklch(21.5% 0.022 55deg));
+  --bg-grid: light-dark(oklch(90% 0.03 80deg / 55%), oklch(32% 0.03 55deg / 55%));
+  --surface: light-dark(oklch(99.2% 0.008 85deg), oklch(25.5% 0.026 55deg));
+  --surface-2: light-dark(oklch(95.5% 0.022 82deg), oklch(28.5% 0.028 55deg));
+  --border: light-dark(oklch(80% 0.04 70deg), oklch(42% 0.04 55deg));
+  --border-strong: light-dark(oklch(30% 0.05 45deg), oklch(93% 0.02 80deg));
+  --text: light-dark(oklch(24% 0.055 45deg), oklch(97.5% 0.015 85deg));
+  --text-muted: light-dark(oklch(45% 0.045 55deg), oklch(80% 0.03 75deg));
+  --text-faint: light-dark(oklch(60% 0.035 65deg), oklch(64% 0.03 70deg));
   --accent: light-dark(var(--brand-500), var(--brand-400));
-  --accent-text: light-dark(oklch(0.52 0.15 48), oklch(0.82 0.17 68));
-  --accent-soft: light-dark(oklch(0.955 0.05 75), oklch(0.32 0.06 62));
-  --on-accent: light-dark(oklch(0.22 0.05 45), oklch(0.2 0.04 50));
-  --btn-primary-bg: light-dark(oklch(0.24 0.055 45), oklch(0.8 0.175 66));
-  --btn-primary-text: light-dark(oklch(0.975 0.02 85), oklch(0.2 0.04 50));
-  --code-bg: light-dark(oklch(0.215 0.02 60), oklch(0.165 0.016 55));
-  --code-text: oklch(0.93 0.015 80);
+  --accent-text: light-dark(oklch(52% 0.15 48deg), oklch(82% 0.17 68deg));
+  --accent-soft: light-dark(oklch(95.5% 0.05 75deg), oklch(32% 0.06 62deg));
+  --on-accent: light-dark(oklch(22% 0.05 45deg), oklch(20% 0.04 50deg));
+  --btn-primary-bg: light-dark(oklch(24% 0.055 45deg), oklch(80% 0.175 66deg));
+  --btn-primary-text: light-dark(oklch(97.5% 0.02 85deg), oklch(20% 0.04 50deg));
+  --code-bg: light-dark(oklch(21.5% 0.02 60deg), oklch(16.5% 0.016 55deg));
+  --code-text: oklch(93% 0.015 80deg);
+
   /* light-dark() only takes colors, so both themes' drop shadows are
      listed, with the other theme's left transparent. */
   --shadow:
-    0 1px 0 light-dark(oklch(1 0 0 / 0.6), oklch(1 0 0 / 0.05)) inset,
-    0 10px 30px -12px light-dark(oklch(0.4 0.08 50 / 0.3), transparent),
-    0 14px 40px -14px light-dark(transparent, oklch(0 0 0 / 0.6));
-  --link: light-dark(oklch(0.5 0.2 295), oklch(0.8 0.14 295));
+    0 1px 0 light-dark(oklch(100% 0 0deg / 60%), oklch(100% 0 0deg / 5%)) inset,
+    0 10px 30px -12px light-dark(oklch(40% 0.08 50deg / 30%), transparent),
+    0 14px 40px -14px light-dark(transparent, oklch(0% 0 0deg / 60%));
+  --link: light-dark(oklch(50% 0.2 295deg), oklch(80% 0.14 295deg));
+
   /* Pressed or current links: further from --bg than --link, so they keep
      more contrast (8.7:1 light, ~12:1 dark). */
-  --link-active: light-dark(oklch(0.42 0.2 295), oklch(0.88 0.07 295));
+  --link-active: light-dark(oklch(42% 0.2 295deg), oklch(88% 0.07 295deg));
 }

@@ -6,14 +6,14 @@
   --radius: 0.75rem;
   --color-text: #1b1f24;
   --color-muted: #59636e;
-  --color-surface: #ffffff;
+  --color-surface: #fff;
   --color-background: #f6f8fa;
   --color-border: #d1d9e0;
   --color-accent: #0969da;
   --color-accent-hover: #0550ae;
   --color-danger: #cf222e;
   --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: ui-monospace, 'SF Mono', menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {

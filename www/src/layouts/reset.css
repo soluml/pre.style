@@ -11,18 +11,18 @@
 }
 
 :root {
-  --grid: 1.5;
-  --gap: calc(1rem * var(--grid));
-
   color-scheme: dark light;
   hanging-punctuation: first last;
-  interpolate-size: allow-keywords;
   height: 100%;
+  interpolate-size: allow-keywords;
   overflow-wrap: anywhere;
   overscroll-behavior: none;
   tab-size: 2;
   width: 100%;
   word-break: normal;
+
+  --grid: 1.5;
+  --gap: calc(1rem * var(--grid));
 }
 
 body {
@@ -75,22 +75,27 @@ h1 {
   font-size: var(--step-6);
   font-weight: 800;
 }
+
 h2 {
   font-size: var(--step-5);
   font-weight: 800;
 }
+
 h3 {
   font-size: var(--step-4);
   font-weight: 800;
 }
+
 h4 {
   font-size: var(--step-3);
   font-weight: 650;
 }
+
 h5 {
   font-size: var(--step-2);
   font-weight: 650;
 }
+
 h6 {
   font-size: var(--step-1);
   font-weight: 650;

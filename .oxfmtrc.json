@@ -2,5 +2,10 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
   "embeddedLanguageFormatting": "off",
-  "ignorePatterns": ["docs/", "**/*.md"]
+  "ignorePatterns": [
+    "docs/",
+    "**/*.md",
+    "packages/stylelint/test/fixtures/",
+    "www/auto-imports.d.ts"
+  ]
 }
