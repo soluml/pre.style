@@ -52,6 +52,11 @@
       "types": "./dist/compiler/index.d.ts",
       "default": "./dist/compiler/index.js"
     },
+    "./find": {
+      "pre.style-source": "./src/find.ts",
+      "types": "./dist/find.d.ts",
+      "default": "./dist/find.js"
+    },
     "./package.schema.json": "./package.schema.json"
   },
   "publishConfig": {
@@ -70,14 +75,19 @@
   },
   "devDependencies": {
     "lightningcss": "^1.33.0",
+    "oxc-parser": "^0.155.0",
     "sass": "^1.106.1"
   },
   "peerDependencies": {
     "lightningcss": "^1.33.0",
+    "oxc-parser": "^0.155.0",
     "sass": "^1.106.1"
   },
   "peerDependenciesMeta": {
     "lightningcss": {
+      "optional": true
+    },
+    "oxc-parser": {
       "optional": true
     },
     "sass": {

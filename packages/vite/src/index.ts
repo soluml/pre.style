@@ -33,8 +33,14 @@ import {
   findInScript,
   locateIn,
   SHEET_IMPORT,
-} from './find.ts';
-import type { CnCall, FoundBlock, FoundImport, ScriptAnalysis, SheetClass } from './find.ts';
+} from '@pre.style/core/find';
+import type {
+  CnCall,
+  FoundBlock,
+  FoundImport,
+  ScriptAnalysis,
+  SheetClass,
+} from '@pre.style/core/find';
 
 export type { LibraryConfig, PackageConfig };
 

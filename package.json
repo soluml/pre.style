@@ -4,6 +4,7 @@
   "workspaces": [
     "packages/core",
     "packages/vite",
+    "packages/stylelint",
     "packages/vscode",
     "packages/devtools",
     "demo/react/*",
@@ -12,9 +13,9 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "npm run build -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
-    "typecheck": "npm run typecheck -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
-    "test": "npm test -w packages/core -w packages/vite -w packages/vscode -w packages/devtools",
+    "build": "npm run build -w packages/core -w packages/vite -w packages/stylelint -w packages/vscode -w packages/devtools",
+    "typecheck": "npm run typecheck -w packages/core -w packages/vite -w packages/stylelint -w packages/vscode -w packages/devtools",
+    "test": "npm test -w packages/core -w packages/vite -w packages/stylelint -w packages/vscode -w packages/devtools",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
