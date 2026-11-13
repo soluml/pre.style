@@ -423,7 +423,7 @@ export class Compiler {
     for (const prepended of this.#prepends()) {
       if (![...prepended.files.css, ...prepended.files.scss].includes(file)) continue;
       try {
-        prepended.code = readPrependCode(prepended.files);
+        Object.assign(prepended, readPrependCode(prepended.files));
       } catch (error) {
         // Kept as it was, until the file can be read again.
         this.#parseOptions.warn(
@@ -534,6 +534,7 @@ export class Compiler {
     library: number;
     options: ParseOptions;
     prependFiles: Record<Lang, string[]>;
+    prependParts: Record<Lang, string[]>;
   } {
     const library =
       file === undefined ? -1 : this.#libraries.findIndex(({ dir }) => file.startsWith(dir));
@@ -548,6 +549,7 @@ export class Compiler {
     return {
       library,
       prependFiles: prepend.files,
+      prependParts: prepend.parts,
       options: {
         ...this.#parseOptions,
         prepend: prepend.code,
@@ -575,7 +577,22 @@ export class Compiler {
   // Parses a stylesheet file and registers its classes and global rules, so
   // the output includes them once the file is used.
   #parseSheet(sheet: Stylesheet): ParsedStylesheet {
-    const { library, options } = this.#library(sheet.file);
+    const { library, prependFiles, prependParts, ...rest } = this.#library(sheet.file);
+    let { options } = rest;
+    // A prepended file isn't prepended to itself when it's compiled as a
+    // stylesheet (TypeScript's content mapper compiles every .scss file in a
+    // program): its rules would be repeated as globals, and Sass rejects a
+    // module it loads twice with `@use`. The other prepended files are.
+    // Resolved like the prepended paths, since TypeScript passes `C:/…` on Windows.
+    const own = prependFiles[sheet.lang].indexOf(resolvePath(sheet.file));
+    if (own !== -1)
+      options = {
+        ...options,
+        prepend: {
+          ...options.prepend,
+          [sheet.lang]: prependParts[sheet.lang].filter((_, i) => i !== own).join('\n'),
+        },
+      };
     const cacheKey = `${library}\n${sheet.lang}\n${sheet.file}\n${sheet.code}`;
     let parsed = this.#stylesheets.get(cacheKey);
     if (parsed === undefined) {
@@ -967,6 +984,9 @@ const fileBlock = (file: string): Block => ({ code: '', lang: 'css', file, line:
 // The code is read again by `fileChanged`.
 interface Prepended {
   files: Record<Lang, string[]>;
+  // Each file's code, in the order of `files`.
+  parts: Record<Lang, string[]>;
+  // The parts joined, as they're prepended.
   code: Record<Lang, string>;
 }
 
@@ -976,15 +996,16 @@ function readPrepend(dir: string, files: PrependFiles | undefined): Prepended {
   const paths = Array.isArray(files)
     ? { css: resolve(files), scss: resolve(files) }
     : { css: resolve(files?.css), scss: resolve(files?.scss) };
-  return { files: paths, code: readPrependCode(paths) };
+  return { files: paths, ...readPrependCode(paths) };
 }
 
-const readFiles = (files: string[]) => files.map((file) => readFileSync(file, 'utf8')).join('\n');
-
-const readPrependCode = (files: Record<Lang, string[]>): Record<Lang, string> => ({
-  css: readFiles(files.css),
-  scss: readFiles(files.scss),
-});
+const readPrependCode = (files: Record<Lang, string[]>): Omit<Prepended, 'files'> => {
+  const parts = {
+    css: files.css.map((file) => readFileSync(file, 'utf8')),
+    scss: files.scss.map((file) => readFileSync(file, 'utf8')),
+  };
+  return { parts, code: { css: parts.css.join('\n'), scss: parts.scss.join('\n') } };
+};
 
 const count = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
 

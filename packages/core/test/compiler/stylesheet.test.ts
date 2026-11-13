@@ -283,6 +283,35 @@ describe('prepended files in stylesheet files', () => {
       `,
     );
   });
+
+  test("a prepended file compiled as a stylesheet isn't prepended to itself", async () => {
+    // As TypeScript's content mapper does for every .scss file in a program,
+    // including prepended ones. Prepended to itself, its `@use` would load
+    // `sass:math` twice, which Sass rejects.
+    const code = `
+      @use 'sass:math';
+      @mixin pad { padding-top: math.div($space, 2); }
+      .a { @include pad; }
+    `;
+    const { exports, css: output } = await compileSheet(code, {
+      lang: 'scss',
+      files: { '_space.scss': '$space: 8px;', 'styles.scss': code },
+      options: { prependFiles: { scss: ['_space.scss', 'styles.scss'] } },
+    });
+    // The other prepended file is still prepended.
+    assert.deepEqual(exports, { a: 'A' });
+    assert.equal(output, css`.A{padding-top:4px}`);
+  });
+
+  test('a css file prepended to itself keeps its classes, without global copies', async () => {
+    const code = '.a { color: red; }';
+    const { exports, css: output } = await compileSheet(code, {
+      files: { 'styles.css': code },
+      options: { prependFiles: { css: ['styles.css'] } },
+    });
+    assert.deepEqual(exports, { a: 'A' });
+    assert.equal(output, css`.A{color:red}`);
+  });
 });
 
 const fails = async (code: string, pattern: RegExp, files: Record<string, string> = {}) =>
