@@ -13,7 +13,7 @@
     "format:check": "oxfmt --check"
   },
   "dependencies": {
-    "@pre.style/core": "3.1.0-alpha.7",
+    "@pre.style/core": "3.1.0-alpha.9",
     "astro": "^7.4.2"
   },
   "devDependencies": {
