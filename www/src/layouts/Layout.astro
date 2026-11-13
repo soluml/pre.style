@@ -13,9 +13,6 @@ interface Props {
 const { title, description } = Astro.props;
 
 const body = scss`
-  --bg-grid-color: rgb(0 0 0 / 13.5%);
-  --bg-grid-gap: 40px;
-
   $grid-stops: var(--bg-grid-color) 0px, var(--bg-grid-color) 1px, transparent 1px, transparent var(--bg-grid-gap);
 
   background-color: #da5b06;
@@ -32,6 +29,9 @@ const body = scss`
   margin: 0;
   min-height: 100%;
   width: 100%;
+
+  --bg-grid-color: rgb(0 0 0 / 13.5%);
+  --bg-grid-gap: 40px;
 
   // &::before {
   //   animation: fadeInOut 1.06s ease-in-out infinite;
