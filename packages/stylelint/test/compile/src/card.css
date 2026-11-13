@@ -1,0 +1,4 @@
+.card {
+  composes: missing from './chip.css';
+  color: red;
+}

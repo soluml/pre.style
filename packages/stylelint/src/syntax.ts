@@ -1,15 +1,16 @@
 import postcss, {
   Document,
   Input,
+  Root,
   type AnyNode,
   type Builder,
   type ProcessOptions,
-  type Root,
   type Rule,
   type Syntax,
 } from 'postcss';
 import postcssScss from 'postcss-scss';
 import type { Lang } from '@pre.style/core/compiler';
+import type { FoundBlock } from '@pre.style/core/find';
 import { fileKind, findBlocks } from './blocks.ts';
 
 // The selector Stylelint sees for the rule each block is wrapped in. A
@@ -19,16 +20,37 @@ import { fileKind, findBlocks } from './blocks.ts';
 export const PLACEHOLDER = '.pre-style';
 
 // Where a block's root came from, kept in its raws.
-interface BlockInfo {
+export interface BlockInfo {
   lang: Lang;
   // The block's content offsets in the file.
   start: number;
   end: number;
   // Each `${…}`'s placeholder, and the text it replaced.
   expressions: [placeholder: string, text: string][];
+  // The block as the finder found it, for the compiler.
+  found: FoundBlock;
+  // The kind of file it's in.
+  kind: 'script' | 'component' | 'html';
 }
 
-type RootRaws = Root['raws'] & { preStyle?: BlockInfo; preStyleLang?: Lang };
+// Blocks used other than the build allows (`css` not used as a tag, or a
+// block in another's `${…}`), found while parsing. They're kept on the
+// document's first root, so `pre-style/compile` reports them once.
+export interface MisusedBlock {
+  message: string;
+  line: number;
+  column: number;
+}
+
+type RootRaws = Root['raws'] & {
+  preStyle?: BlockInfo;
+  preStyleLang?: Lang;
+  preStyleMisused?: MisusedBlock[];
+};
+
+export const blockInfo = (root: Root): BlockInfo | undefined => (root.raws as RootRaws).preStyle;
+export const misusedBlocks = (root: Root): MisusedBlock[] =>
+  (root.raws as RootRaws).preStyleMisused ?? [];
 
 const LANGS: Record<Lang, Syntax> = { css: postcss, scss: postcssScss };
 
@@ -72,11 +94,10 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
     input: new Input(code, opts),
     start: { offset: 0, line: 1, column: 1 },
   };
-  const { blocks } = findBlocks(file, code, kind);
-  if (blocks.length === 0) return document;
+  const { blocks, errors } = findBlocks(file, code, kind);
 
   const blanked = blank(code);
-  for (const { lang, start, end, expressions } of blocks) {
+  for (const { lang, start, end, expressions, found } of blocks) {
     // The content, with each `${…}` replaced by its placeholder. Ids that
     // already appear in the block are skipped, so each placeholder is
     // unique and writing back is a plain replacement.
@@ -101,14 +122,27 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
     const root = LANGS[lang].parse!(text, { ...opts, document: code } as ProcessOptions) as Root;
     const wrapper = root.first as Rule;
     wrapper.selector = PLACEHOLDER;
-    (root.raws as RootRaws).preStyle = { lang, start, end, expressions: replaced };
+    (root.raws as RootRaws).preStyle = { lang, start, end, expressions: replaced, found, kind };
     root.parent = document;
     document.nodes.push(root);
+  }
+
+  if (errors.length > 0) {
+    // Rules only run on roots, so a file with no blocks gets an empty one to
+    // report on. It isn't a block, so it isn't written back.
+    if (document.nodes.length === 0) {
+      const root = new Root({ source: { ...document.source } });
+      root.parent = document;
+      document.nodes.push(root);
+    }
+    (document.nodes[0].raws as RootRaws).preStyleMisused = errors.map(
+      ({ message, line, column }) => ({ message, line, column }),
+    );
   }
   return document;
 }
 
-const info = (root: Root) => (root.raws as RootRaws).preStyle;
+const info = blockInfo;
 
 // Puts each `${…}` back in place of its placeholder.
 function restore(part: string, { expressions }: BlockInfo): string {
