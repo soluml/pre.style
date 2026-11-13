@@ -19,8 +19,8 @@
   "devDependencies": {
     "@astrojs/compiler-rs": "^0.5.3",
     "@iconify-json/icomoon-free": "^1.2.1",
-    "@pre.style/stylelint": "3.1.0-alpha.1",
-    "@pre.style/vite": "3.1.0-alpha.12",
+    "@pre.style/stylelint": "3.1.0-alpha.2",
+    "@pre.style/vite": "3.1.0-alpha.13",
     "browserslist-config-baseline": "^0.5.0",
     "lightningcss": "^1.33.0",
     "oxfmt": "^0.74.0",
