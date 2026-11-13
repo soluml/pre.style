@@ -1,6 +1,6 @@
 {
   "name": "@pre.style/core",
-  "version": "3.1.0-alpha.6",
+  "version": "3.1.0-alpha.7",
   "description": "Zero-runtime CSS-in-JS that compiles css and scss blocks into atomic CSS classes.",
   "keywords": [
     "atomic-css",
@@ -66,7 +66,7 @@
   "scripts": {
     "prepack": "npm run build && cp ../../README.md ../../LICENSE .",
     "postpack": "rm README.md LICENSE",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc",
     "test": "node --test \"test/**/*.test.ts\""
   },
