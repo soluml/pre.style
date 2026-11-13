@@ -12,6 +12,7 @@ import postcssScss from 'postcss-scss';
 import type { Lang } from '@pre.style/core/compiler';
 import type { FoundBlock } from '@pre.style/core/find';
 import { fileKind, findBlocks } from './blocks.ts';
+import { inScope, type ScopeOptions } from './stylesheets.ts';
 
 // The selector Stylelint sees for the rule each block is wrapped in. A
 // block's top level is the inside of a rule, and its class is a single
@@ -78,7 +79,11 @@ export function placeholder(text: string, index: number): string {
   return out;
 }
 
-function parseFile(css: string | { toString(): string }, opts: ProcessOptions = {}) {
+function parseFile(
+  css: string | { toString(): string },
+  opts: ProcessOptions = {},
+  scope?: ScopeOptions,
+) {
   const code = css.toString();
   const file = opts.from ?? '';
   const kind = fileKind(file);
@@ -96,6 +101,8 @@ function parseFile(css: string | { toString(): string }, opts: ProcessOptions = 
     input: new Input(code, opts),
     start: { offset: 0, line: 1, column: 1 },
   };
+  // Files the build doesn't compile have no blocks to lint.
+  if (!inScope(file, scope)) return document;
   const { blocks, errors } = findBlocks(file, code, kind);
 
   const blanked = blank(code);
@@ -254,7 +261,13 @@ function stringify(node: AnyNode | Document, builder: Builder): void {
 
 // Stylelint's `customSyntax`: each block in a JS, TS, Astro, or HTML file is
 // a root of a PostCSS document, and `.css` and `.scss` files are stylesheets.
-const syntax: Syntax<Root | Document> = { parse: parseFile, stringify };
+// Blocks are only linted in files the build compiles: the package's
+// `include` and `exclude`, or `scope`'s.
+export function createSyntax(scope?: ScopeOptions): Syntax<Root | Document> {
+  return { parse: (css, opts) => parseFile(css, opts, scope), stringify };
+}
+
+const syntax = createSyntax();
 
 export default syntax;
 export { parseFile as parse, stringify };

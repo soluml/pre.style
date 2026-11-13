@@ -35,9 +35,9 @@
       "default": "./dist/index.js"
     },
     "./config": {
-      "pre.style-source": "./src/config.ts",
-      "types": "./dist/config.d.ts",
-      "default": "./dist/config.js"
+      "pre.style-source": "./src/default-config.ts",
+      "types": "./dist/default-config.d.ts",
+      "default": "./dist/default-config.js"
     },
     "./syntax": {
       "pre.style-source": "./src/syntax.ts",

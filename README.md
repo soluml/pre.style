@@ -1098,6 +1098,86 @@ The build fails, with the file, line, and column, when:
 | --- | --- |
 | [`pre.style error 1 (<type>)`](https://pre.style/errors/1) | A `${…}` value wasn't a string or a finite number, or `null` or `undefined` to use the default. `number` means it was `NaN` or `Infinity`. For a condition, write `${open ? width : null}` rather than `${open && width}`. |
 
+## Linting with Stylelint
+
+`@pre.style/stylelint` lets [Stylelint](https://stylelint.io/) (version 18) lint the CSS in your blocks and stylesheet files, and reports the errors above without running a build.
+
+```sh
+npm install --save-dev stylelint @pre.style/stylelint
+```
+
+Add pre.style's config to your Stylelint config, **last** in `extends`, so its syntax replaces the one other configs set:
+
+```js
+// stylelint.config.mjs
+export default {
+  extends: ['stylelint-config-standard', '@pre.style/stylelint/config'],
+};
+```
+
+Then lint your source files and stylesheets:
+
+```sh
+npx stylelint "src/**/*.{js,jsx,ts,tsx,astro,html,css,scss}"
+```
+
+pre.style's config sets no style rules of its own: the rules come from the configs you extend, such as `stylelint-config-standard`, or `stylelint-config-standard-scss` if you use SCSS. What it does:
+
+- **Finds blocks the way the build does.** In JS and TS files, only `css` and `scss` imported from `@pre.style/core` are blocks (renamed imports work, and other libraries' `css` is ignored). In Astro components and HTML, blocks are found by text. Only files in the `include` and `exclude` of your `package.json`'s `pre.style` field are linted for blocks, so lint and build agree. Warnings point to the line and column in your file, and `stylelint --fix` fixes blocks in place.
+- **Skips runtime values.** A declaration with `${…}` in its value isn't flagged for its value. The rest of the block is still checked.
+- **Knows your prepended files.** Custom properties, keyframes, and custom media from your `prependFiles` are known to rules such as `no-unknown-custom-properties`, with each library's own files for its blocks.
+- **Knows `composes`.** It isn't reported as an unknown property, and its value is checked.
+- **Reports build errors** with the `pre-style/compile` rule: invalid CSS, Sass errors (with your prepended variables and mixins defined), `${…}` where it can't go, `composes` mistakes, and `css` used other than as a tagged template. Stylesheet files are checked only if they're imported `with { type: 'pre.style' }`, so ordinary CSS files aren't.
+
+### Stylelint options
+
+For options, use `preStyle()` instead of `'@pre.style/stylelint/config'`:
+
+```js
+// stylelint.config.mjs
+import { preStyle } from '@pre.style/stylelint';
+
+export default {
+  extends: ['stylelint-config-standard', preStyle({ packages: ['apps/web', 'packages/ui'] })],
+};
+```
+
+| Option | Description |
+| --- | --- |
+| `packages` | The directories of the packages you lint, each with its own `pre.style` field. Defaults to the current directory. List every app and library when you lint a monorepo from its root. |
+| `include`, `exclude` | Globs that replace the field's `include` and `exclude` for linting, relative to each package. |
+| `referenceFiles` | Your own Stylelint `referenceFiles`. Set them here rather than in your config, since pre.style's per-package settings would replace them. |
+| `lightningcss` | Lightning CSS options for `pre-style/compile`, if you pass any to the bundler plugin, such as `errorRecovery`. |
+
+### SCSS
+
+With `stylelint-config-standard-scss`, put it before pre.style's config in `extends`. If you turn on `stylelint-scss`'s `scss/property-no-unknown`, which doesn't read Stylelint's syntax settings, allow `composes` yourself:
+
+```js
+rules: {
+  'scss/property-no-unknown': [true, { ignoreProperties: ['composes'] }],
+},
+```
+
+### In VS Code
+
+The [Stylelint extension](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) only lints the languages in its `stylelint.validate` setting. Add the ones your blocks are in:
+
+```json
+{
+  "stylelint.validate": [
+    "css",
+    "scss",
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "astro",
+    "html"
+  ]
+}
+```
+
 ## Known limitations
 
 - `@charset` is dropped. Lightning CSS always writes UTF-8.
@@ -1111,13 +1191,18 @@ The build fails, with the file, line, and column, when:
 - Stylesheet imports must be static strings (`import`, `export … from`, and `import('./file.css', { with: { type: 'pre.style' } })`), and can't have a query.
 - TypeScript's content mapper handles every `.css` and `.scss` file in the program, since mappers are chosen by extension. A project that also imports Vite's `.module.css` files without the attribute gets pre.style's types for them.
 - Pages need a doctype (`<!doctype html>`). Without one, browsers use quirks mode, where class selectors ignore case, so classes like `.A` and `.a` would apply to each other's elements. See [Quirks mode](#quirks-mode).
+- Stylelint: stylesheet imports are followed relative to the importing file and as packages, but not through bundler aliases (Vite's `resolve.alias`, or tsconfig `paths`). A stylesheet imported only through an alias isn't checked by `pre-style/compile`.
+- Stylelint: prepended files apply to a whole file, so a `css` block also knows custom properties from `prependFiles.scss`. This can hide a warning, but never causes a false one.
+- Stylelint: in HTML, a fix that would add a backtick or the attribute's own quote can't be written into the attribute, so that block's fixes are skipped.
+- Stylelint: `pre-style/compile` reports errors without a position, such as a misplaced `composes`, at the start of the block (or the first line of a stylesheet file).
 
 ## Packages
 
 | Package           | Description                                                                                                                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@pre.style/core` | `css`, `scss`, and `cn`, the compiler at `@pre.style/core/compiler` for bundler plugins, TypeScript's content mapper for stylesheet files, and the JSON Schema for the `package.json` field. |
+| `@pre.style/core` | `css`, `scss`, and `cn`, the compiler at `@pre.style/core/compiler` and the block finder at `@pre.style/core/find` for bundler plugins and tools, TypeScript's content mapper for stylesheet files, and the JSON Schema for the `package.json` field. |
 | `@pre.style/vite` | The Vite plugin.                                                                                                                                                                             |
+| `@pre.style/stylelint` | Stylelint support: a syntax for blocks, the `pre-style/compile` rule, and a config. See [Linting with Stylelint](#linting-with-stylelint). |
 | [pre.style DevTools](packages/devtools) | A side pane for the Elements panel in Chrome and Firefox that lists every block using each class. Not published to the extension stores yet. |
 
 ## Development
