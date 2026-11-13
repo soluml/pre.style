@@ -1,0 +1,11 @@
+:root {
+  --brand: red;
+}
+
+@custom-media --narrow (width < 40em);
+
+@keyframes spin {
+  to {
+    rotate: 1turn;
+  }
+}

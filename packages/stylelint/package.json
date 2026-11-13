@@ -29,6 +29,11 @@
   ],
   "type": "module",
   "exports": {
+    "./config": {
+      "pre.style-source": "./src/config.ts",
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
     "./syntax": {
       "pre.style-source": "./src/syntax.ts",
       "types": "./dist/syntax.d.ts",
