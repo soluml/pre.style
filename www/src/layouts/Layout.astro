@@ -17,6 +17,8 @@ const { title, description } = Astro.props;
 const body = scss`
   $grid-stops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
 
+  --bg-grid-gap: 1.5rem;
+
   background-image:    
     repeating-linear-gradient(to bottom, $grid-stops),
     repeating-linear-gradient(to right, $grid-stops);
@@ -25,7 +27,7 @@ const body = scss`
   flex-direction: column;
   font-family: var(--font-dm);
 
-  --bg-grid-gap: 1.5rem;  
+  
 
   // &::before {
   //   animation: fadeInOut 1.06s ease-in-out infinite;
@@ -54,7 +56,9 @@ const body = scss`
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <Font cssVariable="--font-dm" preload={[{ style: 'normal' }]} />
     <Font cssVariable="--font-outfit" preload />
