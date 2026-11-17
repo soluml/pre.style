@@ -10,11 +10,24 @@ const NESTING: SelectorComponent = { type: 'nesting' };
 const isNesting = (c: SelectorComponent) => c.type === 'nesting';
 const isPlaceholder = (c: SelectorComponent) => c.type === 'class' && c.name === PLACEHOLDER;
 
-// Replaces the placeholder class with `&`, or returns null if the selector
-// doesn't target the element.
+// Replaces the placeholder class with `&` (including inside `:where()` and
+// similar, where Sass puts it for `:where(&)`), or returns null if the
+// selector doesn't target the element.
 export function fromPlaceholder(selector: Selector): Selector | null {
-  if (!selector.some(isPlaceholder)) return null;
-  return selector.map((c) => (isPlaceholder(c) ? NESTING : c));
+  let found = false;
+  const replace = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(replace);
+    if (value !== null && typeof value === 'object') {
+      if (isPlaceholder(value as SelectorComponent)) {
+        found = true;
+        return NESTING;
+      }
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replace(v)]));
+    }
+    return value;
+  };
+  const result = replace(selector) as Selector;
+  return found ? result : null;
 }
 
 // Whether the selector list is only the element itself (`&`).
