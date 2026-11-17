@@ -1,7 +1,8 @@
 ---
 import { Font } from 'astro:assets';
-import { scss } from '@pre.style/core';
+import { css, scss } from '@pre.style/core';
 import Header from '../components/header/index.astro';
+import Footer from '../components/footer/index.astro';
 
 import './tokens.css' with { type: 'pre.style' };
 import './reset.css' with { type: 'pre.style' };
@@ -19,6 +20,7 @@ const body = scss`
 
   --bg-grid-gap: 1.5rem;
 
+  anchor-name: --body;
   background-image:    
     repeating-linear-gradient(to bottom, $grid-stops),
     repeating-linear-gradient(to right, $grid-stops);
@@ -47,6 +49,10 @@ const body = scss`
   //   100% { opacity: 1; }
   // }
 `;
+
+const main = css`
+  flex: 1;
+`;
 ---
 
 <!doctype html>
@@ -66,8 +72,9 @@ const body = scss`
   </head>
   <body class={body}>
     <Header />
-    <main hidden>
+    <main class={main}>
       <slot />
     </main>
+    <Footer />
   </body>
 </html>
