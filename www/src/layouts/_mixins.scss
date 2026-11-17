@@ -13,3 +13,12 @@
     #{$property}: round($dir, math.div($size, 16) * 1rem, var(--gap));
   }
 }
+
+@mixin layout-grid() {
+  display: grid;
+  grid-template-columns: minmax(var(--gap), 1fr) minmax(0, 77.5rem) minmax(var(--gap), 1fr);
+
+  > * {
+    grid-column: 2;
+  }
+}

@@ -3,15 +3,16 @@ import { css, scss } from '@pre.style/core';
 import Link from '../link.astro';
 import Logo from '../../components/logo/index.astro';
 import GithubIcon from '~icons/icomoon-free/github';
+import Name from '../name.astro';
 
 const header = scss`
+  @include box-grid($size: 72);
+  @include layout-grid;
+
   align-content: center;
   align-items: center;
+  anchor-name: --header;
   background-color: var(--bg);
-  display: grid;
-  grid-template-columns: minmax(var(--gap), 1fr) minmax(0, 77.5rem) minmax(var(--gap), 1fr);
-
-  @include box-grid($size: 72);
 
   a {
     color: currentcolor;
@@ -22,7 +23,6 @@ const cnt = css`
   align-items: center;
   display: flex;
   gap: var(--gap);
-  grid-column: 2;
   justify-content: space-between;
   max-width: 100%;
   min-width: fit-content;
@@ -55,7 +55,7 @@ const nav = css`
   <div class={cnt}>
     <Link class={logoLink} href="/">
       <Logo alt="" />
-      pre.style
+      <Name />
     </Link>
     <nav aria-label="Main" class={nav}>
       <Link href="/">Blog</Link>

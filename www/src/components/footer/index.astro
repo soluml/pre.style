@@ -1,0 +1,38 @@
+---
+import { scss } from '@pre.style/core';
+import Name from '../name.astro';
+
+const currentYear = new Date().getFullYear();
+
+const footer = scss`
+  @include box-grid;
+  @include layout-grid;
+
+  anchor-name: --footer;
+  background-color: var(--bg);
+  font-size: var(--step-0);
+  padding-block: calc(var(--gap) / 2);
+
+  &::before {
+    background-color: var(--bg);
+    content: '';
+    height: calc(mod(anchor-size(--body height), 2px) * 1.5);
+    left: anchor(--footer left);
+    position: absolute;
+    position-anchor: --footer;
+    top: anchor(--footer top);
+    transform: translateY(-100%);
+    width: anchor-size(--footer width);
+  }
+
+  a {
+    color: currentcolor;
+  }
+`;
+---
+
+<footer class={footer}>
+  <div>
+    Copyright &copy; {currentYear} <Name />
+  </div>
+</footer>

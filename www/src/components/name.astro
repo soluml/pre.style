@@ -1,0 +1,14 @@
+---
+import { css } from '@pre.style/core';
+
+const srOnly = css`
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+`;
+---
+
+<span><span class={srOnly}>pre style</span><span aria-hidden="true">pre.style</span></span>
