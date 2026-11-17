@@ -22,3 +22,10 @@
     grid-column: 2;
   }
 }
+
+// Vertical rhythm between direct children (the "lobotomized owl").
+@mixin prose($gap: 1em) {
+  & > * + * {
+    margin-block-start: $gap;
+  }
+}

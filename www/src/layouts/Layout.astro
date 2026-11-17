@@ -1,6 +1,6 @@
 ---
 import { Font } from 'astro:assets';
-import { css, scss } from '@pre.style/core';
+import { cn, scss } from '@pre.style/core';
 import Header from '../components/header/index.astro';
 import Footer from '../components/footer/index.astro';
 
@@ -9,11 +9,12 @@ import './reset.css' with { type: 'pre.style' };
 import 'virtual:pre.style.css';
 
 interface Props {
+  class?: string;
   title: string;
   description: string;
 }
 
-const { title, description } = Astro.props;
+const { class: className, title, description } = Astro.props;
 
 const body = scss`
   $grid-stops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
@@ -28,29 +29,12 @@ const body = scss`
   display: flex;
   flex-direction: column;
   font-family: var(--font-dm);
-
-  
-
-  // &::before {
-  //   animation: fadeInOut 1.06s ease-in-out infinite;
-  //   background-color: color-mix(in srgb, var(--bg-grid-color), black 15%);
-  //   position: absolute;
-  //   content: '';
-  //   left: 0;
-  //   top: var(--bg-grid-gap);
-  //   height: 3px;
-  //   transform: translateY(-50%);
-  //   width: calc(var(--bg-grid-gap) / 2);
-  // }
-
-  // @keyframes fadeInOut {
-  //   0%, 40% { opacity: 1; }
-  //   50%, 90% { opacity: 0; }
-  //   100% { opacity: 1; }
-  // }
 `;
 
-const main = css`
+const main = scss`
+  @include layout-grid;
+  
+  align-content: start;
   flex: 1;
 `;
 ---
@@ -72,7 +56,7 @@ const main = css`
   </head>
   <body class={body}>
     <Header />
-    <main class={main}>
+    <main class={cn(main, className)}>
       <slot />
     </main>
     <Footer />
