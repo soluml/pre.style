@@ -21,6 +21,16 @@ Property names, values, pseudo-classes, at-rules, and Sass variables are complet
 - `triggerPropertyValueCompletion`: suggest values after you pick a property
 - `completePropertyWithSemicolon`: add a semicolon after a completed property
 
+### Prepended files in blocks
+
+Blocks know about the files in your `prependFiles`, as the build does: `css` blocks see the `css` files, and `scss` blocks the `scss` files, from the nearest `package.json` (so a component library's blocks see its own). Their names are completed, and <kbd>Ctrl</kbd>+click (<kbd>Cmd</kbd>+click on macOS) or **Go to Definition** opens where they're defined:
+
+- Sass mixins after `@include`, and placeholders after `@extend`
+- Sass variables and functions in values
+- Custom properties in `var()`
+
+Names defined in the block itself work too. Changes to prepended files apply right away, even before you save them.
+
 ### The `pre.style` field in `package.json`
 
 The `pre.style` field in `package.json` is validated, with completion and descriptions for each option. You don't need to add anything to the `json.schemas` setting.
@@ -68,6 +78,7 @@ Uninstalling leaves your project files as they are, including any `tsconfig.json
 
 - Blocks are found by their tag, so they must use the `css` or `scss` name: a renamed import (`import { css as style }`) isn't recognized.
 - `${…}` in a block is only colored and skipped by completion. The extension adds no other JavaScript features there.
+- Names that a prepended file loads with `@use` or `@forward` aren't completed or followed: only names the file defines itself are.
 - While you type a `{` without its closing `}`, the rest of the file is colored as CSS until you close it.
 - The [styled-components extension](https://marketplace.visualstudio.com/items?itemName=styled-components.vscode-styled-components) also colors `` css` `` templates. If you have both installed, either may color a block.
 
