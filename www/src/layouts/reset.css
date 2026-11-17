@@ -11,6 +11,9 @@
 }
 
 :root {
+  --grid: 1.5;
+  --gap: calc(1rem * var(--grid));
+
   color-scheme: dark light;
   hanging-punctuation: first last;
   height: 100%;
@@ -20,9 +23,6 @@
   tab-size: 2;
   width: 100%;
   word-break: normal;
-
-  --grid: 1.5;
-  --gap: calc(1rem * var(--grid));
 }
 
 body {
