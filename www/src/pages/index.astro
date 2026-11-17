@@ -4,11 +4,14 @@ import Layout from '../layouts/Layout.astro';
 import Name from '../components/name.astro';
 
 const hero = scss`
-  @include prose;
+  @include prose(1.5em);
 
+  background-color: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 1rem;
   margin: auto;
   max-width: 41rem;
-  padding: 1.5rem 1rem;
+  padding: var(--gap);
   text-align: center;
 `;
 
@@ -25,25 +28,25 @@ const visuallyHidden = css`
 `;
 
 const tagline = css`
-  font-size: 1.25rem;
+  font-size: var(--step-3);
   font-weight: 400;
   line-height: 1.4;
   margin-top: 1.25em;
   text-wrap: balance;
 
   @media (width >= 768px) {
-    font-size: 1.5rem;
+    font-size: var(--step-2);
   }
 `;
 
 const badge = css`
-  background-color: rgb(0 0 0 / 75%);
+  background-color: var(--accent-soft);
   border-radius: 999px;
-  color: #fff;
-  font-size: 0.875rem;
+  color: var(--accent-text);
+  font-size: var(--step--1);
   font-weight: 600;
   letter-spacing: 0.08em;
-  margin: 1.25em auto;
+  margin-inline: auto;
   padding: 0.75rem 1rem;
   text-transform: uppercase;
   width: fit-content;
@@ -67,9 +70,9 @@ const install = css`
 
 const codeBox = css`
   align-items: center;
-  background-color: rgb(0 0 0 / 75%);
+  background-color: var(--code-bg);
   border-radius: 0.5rem;
-  color: #fff;
+  color: var(--code-text);
   display: inline-flex;
   max-width: 100%;
   padding: 0.5rem;
