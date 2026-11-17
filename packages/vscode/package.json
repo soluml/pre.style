@@ -3,7 +3,7 @@
   "displayName": "pre.style",
   "version": "3.1.0",
   "private": true,
-  "description": "Editor support for pre.style: color coding and CSS completion in css and scss blocks, validation and completion for the pre.style field in package.json, and TypeScript setup for stylesheet imports.",
+  "description": "Editor support for pre.style: color coding, CSS completion, and go to definition for prepended mixins and variables in css and scss blocks, validation and completion for the pre.style field in package.json, and TypeScript setup for stylesheet imports.",
   "categories": [
     "Programming Languages"
   ],

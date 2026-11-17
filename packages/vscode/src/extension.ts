@@ -4,7 +4,9 @@ import type {
   CompletionSettings,
   Range as LspRange,
 } from 'vscode-css-languageservice';
-import { completeInBlock } from './complete.ts';
+import { findBlockAt } from './blocks.ts';
+import { completeInBlock, defineInBlock, type PrependedFile } from './complete.ts';
+import { prependedFiles, watchPrepended } from './prepend.ts';
 import { registerSetUp } from './setup.ts';
 
 const languages = [
@@ -18,30 +20,65 @@ const languages = [
 
 export function activate(context: vscode.ExtensionContext) {
   registerSetUp(context);
+  watchPrepended(context);
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
       languages,
       { provideCompletionItems },
-      // VS Code's CSS extension's triggers, plus `@` for at-rules and `&` for nesting.
+      // VS Code's CSS extension's triggers, plus `@` for at-rules, `&` for
+      // nesting, and `$` and `%` for Sass variables and placeholders.
       '/',
       '-',
       ':',
       '@',
       '&',
+      '$',
+      '%',
     ),
+    vscode.languages.registerDefinitionProvider(languages, { provideDefinition }),
   );
 }
 
-function provideCompletionItems(
+// The files prepended to the block at `position`, if there is one.
+async function prepended(
   document: vscode.TextDocument,
   position: vscode.Position,
-): vscode.CompletionList | undefined {
+): Promise<PrependedFile[] | undefined> {
+  const html = document.languageId === 'html';
+  const block = findBlockAt(document.getText(), document.offsetAt(position), html);
+  return block && prependedFiles(document, block.language);
+}
+
+async function provideDefinition(
+  document: vscode.TextDocument,
+  position: vscode.Position,
+): Promise<vscode.Location | undefined> {
+  const files = await prepended(document, position);
+  if (!files) return undefined;
+  const result = defineInBlock(
+    document.getText(),
+    document.offsetAt(position),
+    document.languageId === 'html',
+    files,
+  );
+  if (!result) return undefined;
+  const uri = result.uri ? vscode.Uri.parse(result.uri) : document.uri;
+  return new vscode.Location(uri, toRange(result.range));
+}
+
+async function provideCompletionItems(
+  document: vscode.TextDocument,
+  position: vscode.Position,
+): Promise<vscode.CompletionList | undefined> {
+  const files = await prepended(document, position);
+  if (!files) return undefined;
   const result = completeInBlock(
     document.getText(),
     document.offsetAt(position),
     document.languageId === 'html',
     (language) =>
       vscode.workspace.getConfiguration(language, document).get<CompletionSettings>('completion'),
+    files,
   );
   if (!result) return undefined;
   return new vscode.CompletionList(result.list.items.map(toItem), result.list.isIncomplete);
