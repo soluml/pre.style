@@ -21,7 +21,6 @@ const body = scss`
 
   --bg-grid-gap: 1.5rem;
 
-  anchor-name: --body;
   background-image:    
     repeating-linear-gradient(to bottom, $grid-stops),
     repeating-linear-gradient(to right, $grid-stops);
@@ -32,8 +31,9 @@ const body = scss`
 `;
 
 const main = scss`
+  @include box-grid($property: 'min-height');
   @include layout-grid;
-  
+
   align-content: start;
   flex: 1;
 `;

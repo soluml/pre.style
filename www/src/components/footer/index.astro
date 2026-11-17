@@ -8,24 +8,18 @@ const footer = scss`
   @include box-grid;
   @include layout-grid;
 
-  anchor-name: --footer;
+  align-content: center;
   background-color: var(--bg);
   font-size: var(--step-0);
   padding-block: calc(var(--gap) / 2);
 
+  // Header and main are grid multiples, so the only off-grid space is the
+  // viewport's remainder (body min-height is 100svh). Absorb it here so the
+  // footer's top edge sits on a grid line. The 1px swap from height to margin
+  // leaves that grid line visible above the footer.
   @supports (height: calc-size(auto, size)) {
-    &::before {
-      background-color: var(--bg);
-      content: '';
-      height: 0;
-      height: calc(mod(anchor-size(--body height), 2px) * 1.5);
-      left: anchor(--footer left);
-      position: absolute;
-      position-anchor: --footer;
-      top: anchor(--footer top);
-      transform: translateY(-100%);
-      width: anchor-size(--footer width);
-    }
+    height: calc-size(auto, round(up, size, var(--gap)) + mod(100svh, var(--gap)) - 1px);
+    margin-block-start: 1px;
   }
 
   a {
