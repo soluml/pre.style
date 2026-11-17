@@ -3,14 +3,17 @@
 // Snap a box dimension to the vertical grid (multiples of --gap).
 // $size: null  → snap the element's intrinsic size (calc-size(auto, …))
 // $size: int   → pixel count, converted to rem (16 = 1rem) and snapped
-@mixin box-grid($dir: up, $property: 'height', $size: null) {
+// $rows: int   → snap to multiples of this many rows (2 keeps the row count even)
+@mixin box-grid($dir: up, $property: 'height', $size: null, $rows: 1) {
+  $step: if($rows == 1, var(--gap), calc(var(--gap) * #{$rows}));
+
   @if $property == 'both' {
-    @include box-grid($dir, 'height', $size);
-    @include box-grid($dir, 'width', $size);
+    @include box-grid($dir, 'height', $size, $rows);
+    @include box-grid($dir, 'width', $size, $rows);
   } @else if $size == null {
-    #{$property}: calc-size(auto, round($dir, size, var(--gap)));
+    #{$property}: calc-size(auto, round($dir, size, $step));
   } @else {
-    #{$property}: round($dir, math.div($size, 16) * 1rem, var(--gap));
+    #{$property}: round($dir, math.div($size, 16) * 1rem, $step);
   }
 }
 

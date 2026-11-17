@@ -1,6 +1,6 @@
 ---
 import { Font } from 'astro:assets';
-import { cn, scss } from '@pre.style/core';
+import { cn, css, scss } from '@pre.style/core';
 import Header from '../components/header/index.astro';
 import Footer from '../components/footer/index.astro';
 
@@ -9,12 +9,15 @@ import './reset.css' with { type: 'pre.style' };
 import 'virtual:pre.style.css';
 
 interface Props {
+  /** Center the page's content vertically, landing it on grid lines when
+   * its height is an even number of rows (`box-grid($rows: 2)`). */
+  centered?: boolean;
   class?: string;
   title: string;
   description: string;
 }
 
-const { class: className, title, description } = Astro.props;
+const { centered = false, class: className, title, description } = Astro.props;
 
 const body = scss`
   $grid-stops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
@@ -57,9 +60,18 @@ const main = scss`
   </head>
   <body class={body}>
     <Header />
-    <main class={cn(main, className)}>
+    <main
+      class={cn(
+        main,
+        className,
+        centered &&
+          css`
+            align-content: center;
+          `,
+      )}
+    >
       <slot />
     </main>
-    <Footer />
+    <Footer centered={centered} />
   </body>
 </html>

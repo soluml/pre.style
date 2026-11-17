@@ -6,6 +6,11 @@ import Name from '../components/name.astro';
 const hero = scss`
   @include prose(1.5em);
 
+  // An even number of grid rows, like a centered <main> (see Layout), so
+  // centering the hero leaves a whole number of rows above and below it.
+  @include box-grid($rows: 2);
+
+  align-content: center;
   background-color: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 1rem;
@@ -161,9 +166,7 @@ const link = css`
 ---
 
 <Layout
-  class={css`
-    align-content: center;
-  `}
+  centered
   title="pre.style: zero-runtime CSS-in-JS"
   description="Write plain CSS or SCSS next to your markup, and pre.style compiles it at build time into atomic CSS classes. Docs coming soon."
 >

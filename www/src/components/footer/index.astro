@@ -1,6 +1,13 @@
 ---
-import { scss } from '@pre.style/core';
+import { cn, css, scss } from '@pre.style/core';
 import Name from '../name.astro';
+
+interface Props {
+  /** The page centers its content (see Layout), so keep <main> an even number of rows. */
+  centered?: boolean;
+}
+
+const { centered = false } = Astro.props;
 
 const currentYear = new Date().getFullYear();
 
@@ -26,10 +33,21 @@ const footer = scss`
     margin-block-start: 1px;
   }
 `;
+
+// On centered pages, absorb the remainder modulo two rows instead, after the
+// 3-row header and this footer, so <main> is always an even number of rows and
+// content of an even number of rows centers onto grid lines.
+const centeredFooter = scss`
+  @supports (height: calc-size(auto, size)) {
+    $rows: round(up, size, var(--gap));
+
+    height: calc-size(auto, $rows + mod(100svh - 3 * var(--gap) - $rows, 2 * var(--gap)) - 1px);
+  }
+`;
 ---
 
-<footer class={footer}>
-  <div>
+<footer class={cn(footer, centered && centeredFooter)}>
+  <p>
     Copyright &copy; {currentYear} <Name />
-  </div>
+  </p>
 </footer>
