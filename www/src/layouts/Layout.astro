@@ -1,55 +1,45 @@
 ---
 import { Font } from 'astro:assets';
-import { scss } from '@pre.style/core';
+import { cn, css, scss } from '@pre.style/core';
+import Header from '../components/header/index.astro';
+import Footer from '../components/footer/index.astro';
 
+import './tokens.css' with { type: 'pre.style' };
 import './reset.css' with { type: 'pre.style' };
 import 'virtual:pre.style.css';
 
 interface Props {
+  /** Center the page's content vertically, landing it on grid lines when
+   * its height is an even number of rows (`box-grid($rows: 2)`). */
+  centered?: boolean;
+  class?: string;
   title: string;
   description: string;
 }
 
-const { title, description } = Astro.props;
+const { centered = false, class: className, title, description } = Astro.props;
 
 const body = scss`
-  $grid-stops: var(--bg-grid-color) 0px, var(--bg-grid-color) 1px, transparent 1px, transparent var(--bg-grid-gap);
+  $grid-stops: var(--bg-grid) 0px, var(--bg-grid) 1px, transparent 1px, transparent var(--bg-grid-gap);
 
-  background-color: #da5b06;
+  --bg-grid-gap: 1.5rem;
+
   background-image:    
     repeating-linear-gradient(to bottom, $grid-stops),
-    repeating-linear-gradient(to right, $grid-stops),
-    linear-gradient(165deg, oklch(100% 0.24 77deg), oklch(92% 0.41 64deg));
+    repeating-linear-gradient(to right, $grid-stops);
   background-position: top, left;
-  color: rgb(0 0 0 / 85%);
   display: flex;
   flex-direction: column;
-  font-family: var(--font-geist);
-  line-height: 1.5;
-  margin: 0;
-  min-height: 100%;
-  width: 100%;
+  font-family: var(--font-dm);
+`;
 
-  --bg-grid-color: rgb(0 0 0 / 13.5%);
-  --bg-grid-gap: 40px;
+const main = scss`
+  @include box-grid($property: 'min-height');
+  @include layout-grid;
 
-  // &::before {
-  //   animation: fadeInOut 1.06s ease-in-out infinite;
-  //   background-color: color-mix(in srgb, var(--bg-grid-color), black 15%);
-  //   position: absolute;
-  //   content: '';
-  //   left: 0;
-  //   top: var(--bg-grid-gap);
-  //   height: 3px;
-  //   transform: translateY(-50%);
-  //   width: calc(var(--bg-grid-gap) / 2);
-  // }
-
-  // @keyframes fadeInOut {
-  //   0%, 40% { opacity: 1; }
-  //   50%, 90% { opacity: 0; }
-  //   100% { opacity: 1; }
-  // }
+  align-content: start;
+  flex: 1;
+  padding-block: var(--gap);
 `;
 ---
 
@@ -60,11 +50,28 @@ const body = scss`
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
-    <Font cssVariable="--font-geist" preload />
+    <Font cssVariable="--font-dm" preload={[{ style: 'normal' }]} />
+    <Font cssVariable="--font-outfit" preload />
+    <Font cssVariable="--font-plex-mono" />
   </head>
   <body class={body}>
-    <slot />
+    <Header />
+    <main
+      class={cn(
+        main,
+        className,
+        centered &&
+          css`
+            align-content: center;
+          `,
+      )}
+    >
+      <slot />
+    </main>
+    <Footer centered={centered} />
   </body>
 </html>

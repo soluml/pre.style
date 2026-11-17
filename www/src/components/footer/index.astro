@@ -1,0 +1,53 @@
+---
+import { cn, css, scss } from '@pre.style/core';
+import Name from '../name.astro';
+
+interface Props {
+  /** The page centers its content (see Layout), so keep <main> an even number of rows. */
+  centered?: boolean;
+}
+
+const { centered = false } = Astro.props;
+
+const currentYear = new Date().getFullYear();
+
+const footer = scss`
+  @include box-grid;
+  @include layout-grid;
+
+  align-content: center;
+  background-color: var(--bg);
+  font-size: var(--step-0);
+  padding-block: calc(var(--gap) / 2);
+
+  a {
+    color: currentcolor;
+  }
+
+  // Header and main are grid multiples, so the only off-grid space is the
+  // viewport's remainder (body min-height is 100svh). Absorb it here so the
+  // footer's top edge sits on a grid line. The 1px swap from height to margin
+  // leaves that grid line visible above the footer.
+  @supports (height: calc-size(auto, size)) {
+    height: calc-size(auto, round(up, size, var(--gap)) + mod(100svh, var(--gap)) - 1px);
+    margin-block-start: 1px;
+  }
+`;
+
+// On centered pages, absorb the remainder modulo two rows instead, after the
+// 3-row header and this footer, so <main> is always an even number of rows and
+// content of an even number of rows centers onto grid lines.
+const centeredFooter = scss`
+  @supports (height: calc-size(auto, size)) {
+    $rows: round(up, size, var(--gap));
+
+    height: calc-size(auto, $rows + mod(100svh - 3 * var(--gap) - $rows, 2 * var(--gap)) - 1px);
+  }
+`;
+---
+
+<footer class={cn(footer, centered && centeredFooter)}>
+  <p>
+    Copyright &copy; {currentYear} <Name />
+  </p>
+</footer>

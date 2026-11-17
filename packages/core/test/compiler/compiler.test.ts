@@ -630,6 +630,19 @@ describe('scss blocks', () => {
     );
   });
 
+  test('& inside a pseudo-class still targets the element', async () => {
+    const { classes, css: output } = await compile([
+      { code: `:where(&) > * + * { margin-top: 1em }`, lang: 'scss' },
+    ]);
+    assert.deepEqual(classes, ['A']);
+    assert.equal(
+      output,
+      css`
+        :where(.A)>*+*{margin-top:1em}
+      `,
+    );
+  });
+
   test('Sass warnings go to the warn option', async () => {
     const warnings: string[] = [];
     await compile([{ code: '@warn "careful"; color: red', lang: 'scss' }], {

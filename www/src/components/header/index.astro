@@ -1,0 +1,67 @@
+---
+import { css, scss } from '@pre.style/core';
+import Link from '../link.astro';
+import Logo from '../../components/logo/index.astro';
+import GithubIcon from '~icons/icomoon-free/github';
+import Name from '../name.astro';
+
+const header = scss`
+  @include box-grid($size: 72);
+  @include layout-grid;
+
+  align-content: center;
+  align-items: center;
+  anchor-name: --header;
+  background-color: var(--bg);
+
+  a {
+    color: currentcolor;
+  }
+`;
+
+const cnt = css`
+  align-items: center;
+  display: flex;
+  gap: var(--gap);
+  justify-content: space-between;
+  max-width: 100%;
+  min-width: fit-content;
+`;
+
+const logoLink = css`
+  align-items: center;
+  display: inline-flex;
+  font-family: var(--font-outfit);
+  font-size: var(--step-3);
+  font-weight: 800;
+  gap: 0.35em;
+  text-decoration: none;
+  white-space: nowrap;
+`;
+
+const nav = css`
+  display: flex;
+  font-weight: 600;
+  gap: calc(var(--gap) / 2);
+
+  @media (width >= 500px) {
+    gap: var(--gap);
+  }
+`;
+---
+
+<header class={header}>
+  <div class={cnt}>
+    <Link class={logoLink} href="/">
+      <Logo alt="" />
+      <Name />
+    </Link>
+    <nav aria-label="Main" class={nav}>
+      <!-- <Link href="/">Blog</Link>
+      <Link href="/">Docs</Link> -->
+      <Link href="https://github.com/soluml/pre.style" aria-label="GitHub repository">
+        <GithubIcon aria-hidden="true" />
+      </Link>
+    </nav>
+  </div>
+</header>

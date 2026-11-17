@@ -4,7 +4,158 @@
   box-sizing: border-box;
 }
 
+* {
+  font: inherit;
+  margin: 0;
+  padding: 0;
+}
+
 :root {
+  --grid: 1.5;
+  --gap: calc(1rem * var(--grid));
+
+  color-scheme: dark light;
+  hanging-punctuation: first last;
   height: 100%;
+  interpolate-size: allow-keywords;
+  overflow-wrap: anywhere;
+  overscroll-behavior: none;
+  tab-size: 2;
   width: 100%;
+  word-break: normal;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-optical-sizing: auto;
+  font-size: var(--step-1);
+  line-height: var(--grid);
+  min-height: 100%;
+  min-height: max(100svh, 100%);
+  quotes: '\201C' '\201D';
+  width: 100%;
+
+  @media (width >= 344px) {
+    overflow: clip auto;
+  }
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :has(:target) {
+    scroll-behavior: smooth;
+    scroll-padding-top: var(--gap);
+  }
+}
+
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-outfit);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--step-6);
+  font-weight: 800;
+}
+
+h2 {
+  font-size: var(--step-5);
+  font-weight: 800;
+}
+
+h3 {
+  font-size: var(--step-4);
+  font-weight: 800;
+}
+
+h4 {
+  font-size: var(--step-3);
+  font-weight: 650;
+}
+
+h5 {
+  font-size: var(--step-2);
+  font-weight: 650;
+}
+
+h6 {
+  font-size: var(--step-1);
+  font-weight: 650;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+button,
+code,
+kbd,
+pre,
+samp {
+  text-box: trim-both cap alphabetic;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-plex-mono);
+}
+
+pre {
+  white-space: pre-wrap;
+}
+
+:target {
+  scroll-margin-block: 5ex;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  text-decoration-skip-ink: auto;
+
+  &:where(:hover, :focus-visible) {
+    color: var(--link-active);
+    text-decoration: underline;
+  }
+}
+
+svg:where(:not([width], [height], [style])) {
+  aspect-ratio: 1;
+  height: 1lh;
+  vertical-align: text-bottom;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
 }
